@@ -9,6 +9,9 @@
 experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
 [![CRAN
 status](https://www.r-pkg.org/badges/version/PIPEworks)](https://CRAN.R-project.org/package=PIPEworks)
+[![R-CMD-check](https://github.com/xlai/PIPEworks/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/xlai/PIPEworks/actions/workflows/R-CMD-check.yaml)
+[![Codecov test
+coverage](https://codecov.io/gh/xlai/PIPEworks/branch/main/graph/badge.svg)](https://app.codecov.io/gh/xlai/PIPEworks?branch=main)
 <!-- badges: end -->
 
 The goal of PIPEworks is to …
@@ -28,7 +31,7 @@ devtools::install_github("xlai/PIPEworks")
 This is a basic example which shows you how to solve a common problem:
 
 ``` r
-#library(PIPEworks)
+library(PIPEworks)
 ## basic example code
 ```
 

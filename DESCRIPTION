@@ -5,7 +5,6 @@ Authors@R:
     person("Xiaoran", "Lai", , "research@xlai.org", role = c("aut", "cre"),
            comment = c(ORCID = "YOUR-ORCID-ID"))
 Description: A bayesian method for dose escalation studies.
-
 License: GPL (>= 3)
 Suggests: 
     testthat (>= 3.0.0)
