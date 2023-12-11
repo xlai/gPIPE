@@ -1,0 +1,129 @@
+---
+title: "Vignette: Constructors for PIPE Modelling"
+output:
+    bookdown::html_document2: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+This vignette demonstrates the use of four constructors: 
+`DrugDose`, `PipeEstimator`, `PatientDataModel`, and `DrugCombinationModel`. 
+These constructors are used for modelling different aspects of a clinical trial under PIPE design.
+
+## Setup
+First, we need to ensure that the `yaml` package is installed and loaded.
+
+```{r pkg-setup, echo = TRUE}
+if (!requireNamespace("yaml", quietly = TRUE)) {
+    install.packages("yaml")
+}
+library(yaml)
+```
+
+### Reading dose information from a YAML file
+```{r dose-levels, echo = TRUE}
+dose_info <- yaml::read_yaml("./src/doses.yaml")
+print(dose_info)
+```
+
+## DrugDose Constructor
+
+We can create the object directly,
+```{r, echo = TRUE}
+num_doses <- list(Drug1 = 3, Drug2 = 2)
+drug_dose_obj <- createDrugDose(num_doses = num_doses)
+```
+
+or it can be created from YAML specifying dose label and their corresponding numerical level.
+```{r, echo = TRUE}
+drug_dose_obj <- createDrugDose(dose_info = dose_info)
+```
+
+Here are a few things that we can do with the constructor:
+```{r, echo = TRUE}
+# Get dose labels for Drug1
+drug1_labels <- drug_dose_obj$getDoseLabels("Drug1")
+print(drug1_labels)
+# Get numeric order for dose 2 of Drug1
+
+dose_order <- drug_dose_obj$getNumericOrder("Drug1", "Medium")
+print(dose_order)
+
+# Assuming the DrugDose object is already created with some drugs and dose levels
+# Add a new dose label to a drug
+drug_dose_obj$addDoseLabel("Drug1", new_label = "Extra", new_order = 2)
+
+# Get updated dose labels for Drug1
+updated_labels <- drug_dose_obj$getDoseLabels("Drug1")
+print(updated_labels)
+
+# Get numeric order for the new label 'Extra'
+extra_dose_order <- drug_dose_obj$getNumericOrder("Drug1", "Extra")
+print(extra_dose_order)
+
+```
+
+## PipeEstimator Constructor
+
+Assuming the DrugDose object (`drug_dose_obj`) is already created. Let's create a PipeEstimator object
+```{r, echo = TRUE}
+pipe_estimator <- createPipeEstimator(drug_dose_obj, isNonDecreasing = TRUE)
+# New configuration to set
+newGamma <- list("Low", "d3")
+# Manually update the configuration
+pipe_estimator$updateConfiguration(newGamma)
+
+# Example gamma configuration to check
+gammaConfigs <- list(
+    list("Low", "d1"),
+    list("Low", "d4")
+)
+# Check if the configuration is valid
+is_valid <- pipe_estimator$isValidConfiguration(gammaConfigs)
+print(is_valid)
+```
+
+## PatientDataModel Constructor
+
+Assuming `drug_dose_obj` is an instance of DrugDose with valid dose levels for each drug
+
+Create a PatientDataModel object:
+```{r, echo = TRUE}
+patientDataModel <- createPatientDataModel(drug_dose_obj)
+
+# Add patient data with dose levels for each drug
+patientDataModel$addPatientData(doseCombination = list(Drug1 = "Low", Drug2 = "d1"), outcome = 0)
+patientDataModel$addPatientData(doseCombination = list(Drug1 = "Low", Drug2 = "d1"), outcome = 0)
+patientDataModel$addPatientData(doseCombination = list(Drug1 = "Low", Drug2 = "d1"), outcome = 0)
+patientDataModel$addPatientData(doseCombination = list(Drug1 = "Medium", Drug2 = "d2"), outcome = 1)
+# ...
+
+# Get summary statistics for each dose level combination
+summaryStats <- patientDataModel$getSummaryStats()
+print(summaryStats)
+
+# Define maximum dose levels for each drug
+maxDoseLevels <- list(Drug1 = "Medium", Drug2 = "d3")
+
+# Generate random patient data
+patientDataModel$generateRandomPatientData(maxDoseLevels, numPatients = 10, outcomeProb = 0.3)
+
+# View generated data
+print(patientDataModel$patientData)
+
+```
+
+## DrugCombinationModel Constructor
+```{r, echo = TRUE}
+# Create a DrugCombinationModel object
+drugCombinationModel <- createDrugCombinationModel("./src/drugPrior.yaml")
+
+# Update the model based on patient data
+updatedModel <- drugCombinationModel$updateModel(patientDataModel)
+
+# View updated model statistics
+print(updatedModel)
+```
