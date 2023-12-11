@@ -1,0 +1,11 @@
+Drug1:
+  DoseLevels:
+    Low: 1
+    Medium: 2
+    High: 3
+Drug2:
+  DoseLevels:
+    d1: 1
+    d2: 2
+    d3: 3
+    d4: 4    
