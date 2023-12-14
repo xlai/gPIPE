@@ -1,10 +1,10 @@
-Drug1:
-  DoseLevels:
+- name: "Drug1"
+  doses:
     Low: 1
     Medium: 2
     High: 3
-Drug2:
-  DoseLevels:
+- name: "Drug2"
+  doses:
     d1: 1
     d2: 2
     d3: 3
