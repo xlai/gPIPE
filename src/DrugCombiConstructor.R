@@ -18,19 +18,57 @@ DrugCombi <- setRefClass(
             .self$generateCombinations()
         },
         generateCombinations = function() {
-            # Generate all valid combinations of dose levels
-            if (length(drugs) > 0) {
-                combinationLists <- lapply(drugs, function(d) d$getDoseLevels())
-                doseCombinations <<- expand.grid(combinationLists)
-                # Validate and filter combinations here if needed
+            if (length(drugs) == 0) {
+                doseCombinations <<- list()
+                return()
             }
+
+            # Extracting dose labels and levels from each drug
+            labelsList <- lapply(drugs, function(d) d$getDoseLabels())
+            levelsList <- lapply(drugs, function(d) d$getDoseLevels())
+
+            # Creating all possible combinations of dose labels
+            labelCombinations <- expand.grid(labelsList, stringsAsFactors = FALSE)
+            
+            # Creating combination names and mapping to numeric levels
+            combinedNames <- apply(labelCombinations, 1, paste, collapse = "-")
+
+            # Assigning row numbers as unique identifiers for each combination
+            combinationIDs <- seq_len(nrow(levelCombinations))
+
+            # Mapping each label combination to its corresponding numeric levels
+            levelCombinations <- expand.grid(levelsList, stringsAsFactors = FALSE)
+            combinedLevels <- apply(levelCombinations, 1, function(x) as.numeric(x))
+
+            # Storing combinations in doseCombinations
+            # Each combination is a list with levels and its corresponding combination ID
+            # Storing combinations in doseCombinations
+            doseCombinations <<- setNames(
+                lapply(combinationIDs, function(i) {
+                    list(levels = combinedLevels[, i], id = i)
+                }),
+                combinedNames
+            )
         },
+        updateCombinations = function() {
+            # Call this method to update the combinations
+            # whenever there's a change in any of the Drug objects
+            .self$generateCombinations()
+        },        
         getDoseCombinations = function() {
             return(doseCombinations)
         },
         print = function() {
-            cat("Drug Combination:\n")
-            print(doseCombinations)
+            cat("Drug Combination of:")
+            drugNames <- lapply(drugs, function(drug) drug$name)
+            cat(paste(unlist(drugNames), collapse = ", "), "\n")
+
+            cat("Drug Levels:\n")
+            if (length(doseCombinations) == 0) {
+                cat("No dose combinations generated yet.\n")
+            } else {
+                    cat( names(doseCombinations), "\n")
+            }
         }
         # ... (other methods as needed)
     )

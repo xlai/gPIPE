@@ -71,9 +71,14 @@ Drug <- setRefClass("Drug",
 
 # Function to create a new Drug object
 createDrug <- function(drugData = NULL, name = NULL, doseCount = NULL) {
-    return(
-        lapply(
-            drugData,
-            function(d) Drug$new(drugData = d, name = name, doseCount = doseCount))
-    )
+    if (is.null(drugData)){
+        return( Drug$new(name = name, doseCount = doseCount))
+    }
+    else{
+        return(
+            lapply(
+                drugData,
+                function(d) Drug$new(drugData = d, name = name, doseCount = doseCount))
+        )
+    }
 }
