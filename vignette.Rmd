@@ -36,36 +36,45 @@ print(drugData)
 
 We can create the object directly,
 ```{r, echo = TRUE}
-num_doses <- list(Drug1 = 3, Drug2 = 2)
-drug_dose_obj <- createDrugDose(num_doses = num_doses)
+num_doses <- 3
+drugA <- createDrug(name = 'drugA', doseCount = num_doses)
 ```
 
 or it can be created from YAML specifying dose label and their corresponding numerical level.
 ```{r, echo = TRUE}
-drug_dose_obj <- createDrugDose(dose_info = dose_info)
+drug_list <- createDrug(drugData = drugData)
 ```
 
 Here are a few things that we can do with the constructor:
 ```{r, echo = TRUE}
 # Get dose labels for Drug1
-drug1_labels <- drug_dose_obj$getDoseLabels("Drug1")
+drug_labels <- lapply(drug_list, function(d){d$getDoseLabels()})
 print(drug1_labels)
-# Get numeric order for dose 2 of Drug1
-
-dose_order <- drug_dose_obj$getNumericOrder("Drug1", "Medium")
-print(dose_order)
+# Get numeric order for dose 2 of DrugA
+drugA = drug_list[[1]]
+dose_levelA <- drugA$getDoseLevels("Medium")
+print(dose_levelA)
 
 # Assuming the DrugDose object is already created with some drugs and dose levels
 # Add a new dose label to a drug
-drug_dose_obj$addDoseLabel("Drug1", new_label = "Extra", new_order = 2)
+drugA$addDose(new_label = "Extra", new_level = 2)
 
 # Get updated dose labels for Drug1
-updated_labels <- drug_dose_obj$getDoseLabels("Drug1")
+updated_labels <- drugA$getDoseLabels()
 print(updated_labels)
 
 # Get numeric order for the new label 'Extra'
-extra_dose_order <- drug_dose_obj$getNumericOrder("Drug1", "Extra")
+extra_dose_order <- drugA$getDoseLevels("Extra")
 print(extra_dose_order)
+
+```
+
+## Drug Combination constructor
+Drug combination constructor is a coomposite constructor of multiple drugs that gives additional methods that are 
+uniquely defined for drug combinations
+
+```{r, echo = TRUE}
+drugcombi_new <- DrugCombi$new(drugs = drug_list)
 
 ```
 
