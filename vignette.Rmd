@@ -6,6 +6,9 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+path_to_source <- "./src/"
+files_to_source <- list.files(path = path_to_source, pattern = '*.R')
+sapply(files_to_source, function(x) source(paste0(path_to_source, x )))
 ```
 
 ## Introduction
@@ -25,8 +28,8 @@ library(yaml)
 
 ### Reading dose information from a YAML file
 ```{r dose-levels, echo = TRUE}
-dose_info <- yaml::read_yaml("./src/doses.yaml")
-print(dose_info)
+drugData <- yaml::read_yaml("./src/doses.yaml")
+print(drugData)
 ```
 
 ## DrugDose Constructor
