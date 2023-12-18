@@ -12,8 +12,8 @@ sapply(files_to_source, function(x) source(paste0(path_to_source, x )))
 ```
 
 ## Introduction
-This vignette demonstrates the use of four constructors: 
-`DrugDose`, `PipeEstimator`, `PatientDataModel`, and `DrugCombinationModel`. 
+This vignette demonstrates the use of five classes: 
+`Drug`, `DrugCombination`, `PipeEstimator`, `PatientDataModel`, and `DrugCombinationModel`. 
 These constructors are used for modelling different aspects of a clinical trial under PIPE design.
 
 ## Setup
@@ -32,7 +32,9 @@ drugData <- yaml::read_yaml("./src/doses.yaml")
 print(drugData)
 ```
 
-## DrugDose Constructor
+## Drug Class
+he Drug class in R is designed to manage drug information, including its name and dose levels. 
+It offers a versatile way of initializing drug data either from a structured input (like a YAML file) or programmatically with specified parameters.
 
 We can create the object directly,
 ```{r, echo = TRUE}
@@ -45,7 +47,8 @@ or it can be created from YAML specifying dose label and their corresponding num
 drug_list <- createDrug(drugData = drugData)
 ```
 
-Here are a few things that we can do with the constructor:
+Here are a few things that we can do with the classes:
+### Get dose informations
 ```{r, echo = TRUE}
 # Get dose labels for Drug1
 drug_labels <- lapply(drug_list, function(d){d$getDoseLabels()})
@@ -54,7 +57,10 @@ print(drug1_labels)
 drugA = drug_list[[1]]
 dose_levelA <- drugA$getDoseLevels("Medium")
 print(dose_levelA)
+```
 
+### Add additional dose(s)
+```{r, echo = TRUE}
 # Assuming the DrugDose object is already created with some drugs and dose levels
 # Add a new dose label to a drug
 drugA$addDose(new_label = "Extra", new_level = 2)
@@ -69,18 +75,21 @@ print(extra_dose_order)
 
 ```
 
-## Drug Combination constructor
-Drug combination constructor is a coomposite constructor of multiple drugs that gives additional methods that are 
+## `DrugCombi` Class
+
+The DrugCombi class, short for Drug Combination, is designed for managing combinations of different drugs and their respective dose levels. 
+
+It is a coomposite constructor of multiple drugs that gives additional methods that are 
 uniquely defined for drug combinations
 
+Assume we have a list of drug created using `Drug` class, the a `DrugCombi` object can be initialised as the following
 ```{r, echo = TRUE}
-drugcombi_new <- DrugCombi$new(drugs = drug_list)
-
+drugcombi_new <- DrugCombi$new(drugs =drug_list)
 ```
 
 ## PipeEstimator Constructor
 
-Assuming the DrugDose object (`drug_dose_obj`) is already created. Let's create a PipeEstimator object
+Assuming the DrugCombi object (`drugcombi_new`) is already created. Let's create a PipeEstimator object
 ```{r, echo = TRUE}
 pipe_estimator <- createPipeEstimator(drug_dose_obj, isNonDecreasing = TRUE)
 # New configuration to set
@@ -104,28 +113,28 @@ Assuming `drug_dose_obj` is an instance of DrugDose with valid dose levels for e
 
 Create a PatientDataModel object:
 ```{r, echo = TRUE}
-patientDataModel <- createPatientDataModel(drug_dose_obj)
+patientDataModel <- createPatientDataModel(drugcombi_new)
 
 # Add patient data with dose levels for each drug
-patientDataModel$addPatientData(doseCombination = list(Drug1 = "Low", Drug2 = "d1"), outcome = 0)
-patientDataModel$addPatientData(doseCombination = list(Drug1 = "Low", Drug2 = "d1"), outcome = 0)
-patientDataModel$addPatientData(doseCombination = list(Drug1 = "Low", Drug2 = "d1"), outcome = 0)
-patientDataModel$addPatientData(doseCombination = list(Drug1 = "Medium", Drug2 = "d2"), outcome = 1)
+patientDataModel$addPatientData(doseCombination = "Low-d1", outcome = 0)
+patientDataModel$addPatientData(doseCombination = "Low-d2", outcome = 1)
 # ...
 
 # Get summary statistics for each dose level combination
-summaryStats <- patientDataModel$getSummaryStats()
+summaryStats <- patientDataModel$getSummaryStats(includeAllCombi = FALSE)
 print(summaryStats)
 
 # Define maximum dose levels for each drug
-maxDoseLevels <- list(Drug1 = "Medium", Drug2 = "d3")
+maxDoseLevel <- "Medium-d3"
 
 # Generate random patient data
-patientDataModel$generateRandomPatientData(maxDoseLevels, numPatients = 10, outcomeProb = 0.3)
+patientDataModel$generateRandomPatientData(maxDoseLevel, numPatients = 10, outcomeProb = 0.3)
 
 # View generated data
 print(patientDataModel$patientData)
 
+summaryStats <- patientDataModel$getSummaryStats(includeAllCombi = TRUE)
+print(summaryStats)
 ```
 
 ## DrugCombinationModel Constructor
