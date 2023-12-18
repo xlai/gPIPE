@@ -1,53 +1,38 @@
-PipeEstimator <- setRefClass("PipeEstimator",
+DoseConfiguration <- setRefClass("DoseConfiguration",
     fields = list(
-        drugCombi = "DrugCombi",  # The DrugDose object
+        drugCombi = "DrugCombination",  # The DrugDose object
         currentConfig = "list",  # Current configuration of dose levels for each drug
-        isNonDecreasing = "logical"  # TRUE for non-decreasing, FALSE for non-increasing
+        isNonDecreasing = "logical",  # TRUE for non-decreasing, FALSE for non-increasing
+        isValid = "logical" # TRUE for valid dose config, FALSE otherwise
     ),
     methods = list(
-        initialize = function(drugCombiObject = NULL, isNonDecreasing = TRUE) {
+        initialize = function(drugCombiObject = NULL, isNonDecreasing = TRUE, currentConfig = NULL) {
             if (is.null(drugCombiObject)) {
                 # Handle the case where drugDoseObject is NULL
                 # This can be set to a default DrugDose object or keep it as NULL
                 # Example: drugDose <<- DrugDose$new() or drugDose <<- NULL
-                drugCombi <<- NULL  # or any other default initialization
+                drugCombi <<- DrugCombi$new()  # or any other default initialization
             } else {
                 drugCombi <<- drugCombiObject
             }
+            currentConfig <<- list()
             isNonDecreasing <<- isNonDecreasing
-            # Initialize the current configuration with NULL for each drug
-            if (!is.null(drugCombiObject)) {
-                currentConfig <<- lapply(drugCombiObject$doseCombinations, function(x) NULL)
-            } else {
-                currentConfig <<- NULL
-            }
+            isValid <<- .self$isValidConfiguration()
         },
-        isValidConfiguration = function(gammaConfigs) {
-            # Check the validity of multiple gamma configurations
-            # gammaConfigs: A list of configurations, each configuration being a list of dose levels for each drug
-
+        isValidConfiguration = function() {
+            # Check the validity of its current configurations and return logcial value
             # Function to check a single configuration
-            checkSingleConfig <- function(gamma) {
-                if (length(gamma) != length(currentConfig)) {
-                    return(FALSE)  # Invalid configuration length
-                }
-                else{
-                    return(checkMonotonicity(gamma, increasing = isNonDecreasing))
-                }
-                return(TRUE)
+            if (length(currentConfig) == 0) {
+                return(FALSE)  # Invalid configuration length
             }
-
-            # Apply the check to each configuration in the list
-            return(sapply(gammaConfigs, checkSingleConfig))
+            else{
+                return(checkMonotonicity(currentConfig, increasing = isNonDecreasing))
+            }
         },        
         updateConfiguration = function(newConfig, updateFunction = NULL) {
-            if (!is.null(updateFunction) && is.function(updateFunction)) {
-                # Update configuration using the provided function
-                currentConfig <<- updateFunction(newConfig)
-            } else {
                 # Manually set the new configuration
                 currentConfig <<- newConfig
-            }
+                isValid <<- .self$isValidConfiguration()
         }        
         # ... (other methods if necessary)
     )
@@ -112,24 +97,4 @@ checkMonotonicity <- function(gamma, increasing = TRUE) {
     }
     
     return(TRUE)
-}
-
-# Function to create a new PipeEstimator object
-createPipeEstimator <- function(drugDoseObject = NULL, isNonDecreasing = TRUE) {
-    return(PipeEstimator$new(drugDoseObject, isNonDecreasing))
-}
-
-logGain <- function(p_posterior, epsilon, weight, pipe_configuration){
-    log_gain_vector <- weight*pipe_configuration*(log(epsilon) + log(p_posterior)) +
-        weight*(1 - pipe_configuration)*(log(1 - epsilon) + log(1 - p_posterior))
-
-return(sum(logLL_vector))
-}
-
-updateByAsymmetricGain <- function(p_posterior, epsilon, weight, pipe_list){
-    log_gain_list <- lapply(
-        pipe_list, 
-        function(pipe_configuration) {loglikelihood(p_posterior, epsilon, weight, pipe_configuration)}
-    )
-    return(pipe_list[[which.max(log_ll_list)]])
 }

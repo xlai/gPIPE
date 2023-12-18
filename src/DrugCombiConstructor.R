@@ -58,6 +58,14 @@ DrugCombi <- setRefClass(
         getDoseCombinations = function() {
             return(doseCombinations)
         },
+        getDoseCombinationsLevel = function(doseCombi_selected= NULL) {
+            if (is.null(doseCombi_selected)){
+                return(as.numeric(lapply(doseCombinations, function(x) x$id)))
+            }
+            else {
+               return(as.numeric(doseCombinations[[doseCombi_selected]]$id))
+            }
+        },        
         print = function() {
             cat("Drug Combination of:")
             drugNames <- lapply(drugs, function(drug) drug$name)
