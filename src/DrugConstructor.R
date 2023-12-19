@@ -27,7 +27,10 @@ Drug <- setRefClass("Drug",
         },
         print = function() {
             cat("Drug Name:", name, "\nDose Levels:", .self$getDoseLabels(), "\n")
-        },        
+        },
+        getNumberOfDoseLevels = function() {
+            return(length(doses))
+        },
         getDoseLevels = function(doseLabel = NULL) {
             # Validate input
             if (is.null(doseLabel)) {

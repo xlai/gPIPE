@@ -31,7 +31,7 @@ DrugCombi <- setRefClass(
             labelCombinations <- expand.grid(labelsList, stringsAsFactors = FALSE)
             
             # Creating combination names and mapping to numeric levels
-            combinedNames <- apply(labelCombinations, 1, paste, collapse = "-")
+            combinedNames <- apply(labelCombinations, 1, paste, collapse = ".")
 
             # Assigning row numbers as unique identifiers for each combination
             combinationIDs <- seq_len(nrow(levelCombinations))
@@ -58,12 +58,21 @@ DrugCombi <- setRefClass(
         getDoseCombinations = function() {
             return(doseCombinations)
         },
-        getDoseCombinationsLevel = function(doseCombi_selected= NULL) {
+        getNumberOfDoseLevels = function(combined = FALSE) {
+            if (combined) {
+                # Return the number of combined dose levels
+                return(length(doseCombinations))
+            } else {
+                # Return a tuple of dose levels for each separate drug
+                return(sapply(drugs, function(drug) drug$getNumberOfDoseLevels()))
+            }
+        },
+        getDoseCombinationsLevel = function(doseCombi_selected = NULL) {
             if (is.null(doseCombi_selected)){
-                return(as.numeric(lapply(doseCombinations, function(x) x$id)))
+                return(sapply(doseCombinations, function(x) x$id))
             }
             else {
-               return(as.numeric(doseCombinations[[doseCombi_selected]]$id))
+               return(sapply(doseCombinations[doseCombi_selected], function(x) x$id))
             }
         },        
         print = function() {

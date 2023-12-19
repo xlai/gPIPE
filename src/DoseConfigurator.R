@@ -1,7 +1,7 @@
 DoseConfiguration <- setRefClass("DoseConfiguration",
     fields = list(
         drugCombi = "DrugCombination",  # The DrugDose object
-        currentConfig = "list",  # Current configuration of dose levels for each drug
+        currentConfig = "numeric",  # Current configuration of dose levels for each drug
         isNonDecreasing = "logical",  # TRUE for non-decreasing, FALSE for non-increasing
         isValid = "logical" # TRUE for valid dose config, FALSE otherwise
     ),
@@ -15,7 +15,7 @@ DoseConfiguration <- setRefClass("DoseConfiguration",
             } else {
                 drugCombi <<- drugCombiObject
             }
-            currentConfig <<- list()
+            currentConfig <<- numeric(length = length(drugCombi$doseCombinations))
             isNonDecreasing <<- isNonDecreasing
             isValid <<- .self$isValidConfiguration()
         },
@@ -26,10 +26,10 @@ DoseConfiguration <- setRefClass("DoseConfiguration",
                 return(FALSE)  # Invalid configuration length
             }
             else{
-                return(checkMonotonicity(currentConfig, increasing = isNonDecreasing))
+                return(checkMonotonicity(currentConfig, drugCombi, increasing = isNonDecreasing))
             }
         },        
-        updateConfiguration = function(newConfig, updateFunction = NULL) {
+        updateConfiguration = function(newConfig) {
                 # Manually set the new configuration
                 currentConfig <<- newConfig
                 isValid <<- .self$isValidConfiguration()
@@ -55,27 +55,13 @@ slice_array_by_dimension <- function(array) {
   return(all_slices)
 }
 
-checkMonotonicity <- function(gamma, increasing = TRUE) {
+checkMonotonicity <- function(currentConfig, drugCombi, increasing = TRUE) {
     # Determine the number of dimensions
-    numDims <- max(sapply(gamma, function(x) length(x$levels)))
-    
-    # Find the maximum values for each dimension
-    maxValues <- sapply(1:numDims, function(d) {
-        max(sapply(gamma, function(x) {
-            if (length(x$levels) >= d) x$levels[d] else 0
-        }))
-    })
-    
+    numDoseLevels <- drugCombi$getNumberOfDoseLevels(combined = FALSE)
+    numDims <- length(numDoseLevels)
+    indices <- drugCombi$getDoseCombinationsLevel()
     # Create an array to store the gamma values, initialised with 0
-    gammaArray <- array(0, dim = maxValues)
-    
-    # Fill the array with the corresponding validity values
-    for (name in names(gamma)) {
-        item <- gamma[[name]]
-        indices <- item$id
-        validity <- ifelse(item$validity, 1, 0) # Convert TRUE/FALSE to 1/0
-        gammaArray[indices] <- validity
-    }
+    gammaArray <- array(currentConfig, dim = numDoseLevels)
     
     # Pre-compute slices for each dimension
     slices <- slice_array_by_dimension(gammaArray)
@@ -89,7 +75,7 @@ checkMonotonicity <- function(gamma, increasing = TRUE) {
 
     # Check monotonicity in each dimension
     for (d in 1:numDims) {
-        for (index in 1:(maxValues[d] - 1)) {
+        for (index in 1:(numDoseLevels[d] - 1)) {
             if (compare(slices[[d]][[index]], slices[[d]][[index + 1]])) {
                 return(FALSE)
             }
