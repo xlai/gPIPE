@@ -11,12 +11,12 @@ files_to_source <- list.files(path = path_to_source, pattern = '*.R')
 sapply(files_to_source, function(x) source(paste0(path_to_source, x )))
 ```
 
-## Introduction
+# Introduction
 This vignette demonstrates the use of five classes: 
 `Drug`, `DrugCombination`, `PipeEstimator`, `PatientDataModel`, and `DrugCombinationModel`. 
 These constructors are used for modelling different aspects of a clinical trial under PIPE design.
 
-## Setup
+# Setup
 First, we need to ensure that the `yaml` package is installed and loaded.
 
 ```{r pkg-setup, echo = TRUE}
@@ -24,13 +24,17 @@ if (!requireNamespace("yaml", quietly = TRUE)) {
     install.packages("yaml")
 }
 library(yaml)
+library(kableExtra) # For knitting dataframes
+library(dplyr)
 ```
 
-### Reading dose information from a YAML file
+## Reading dose information from a YAML file
 ```{r dose-levels, echo = TRUE}
 drugData <- yaml::read_yaml("./src/doses.yaml")
 print(drugData)
 ```
+
+# Constructors
 
 ## Drug Class
 he Drug class in R is designed to manage drug information, including its name and dose levels. 
@@ -52,7 +56,7 @@ Here are a few things that we can do with the classes:
 ```{r, echo = TRUE}
 # Get dose labels for Drug1
 drug_labels <- lapply(drug_list, function(d){d$getDoseLabels()})
-print(drug1_labels)
+print(drug_labels)
 # Get numeric order for dose 2 of DrugA
 drugA = drug_list[[1]]
 dose_levelA <- drugA$getDoseLevels("Medium")
@@ -75,7 +79,7 @@ print(extra_dose_order)
 
 ```
 
-## `DrugCombi` Class
+## Drug Combination Class
 
 The DrugCombi class, short for Drug Combination, is designed for managing combinations of different drugs and their respective dose levels. 
 
@@ -84,67 +88,201 @@ uniquely defined for drug combinations
 
 Assume we have a list of drug created using `Drug` class, the a `DrugCombi` object can be initialised as the following
 ```{r, echo = TRUE}
-drugcombi_new <- DrugCombi$new(drugs =drug_list)
+drugcombi_new <- DrugCombi$new(drugs =drug_list) 
 ```
 
-## PipeEstimator Constructor
+## Dose Configuration Class
 
-Assuming the DrugCombi object (`drugcombi_new`) is already created. Let's create a PipeEstimator object
-```{r, echo = TRUE}
-pipe_estimator <- createPipeEstimator(drug_dose_obj, isNonDecreasing = TRUE)
-# New configuration to set
-newGamma <- list("Low", "d3")
-# Manually update the configuration
-pipe_estimator$updateConfiguration(newGamma)
-
-# Example gamma configuration to check
-gammaConfigs <- list(
-    list("Low", "d1"),
-    list("Low", "d4")
+Assuming the DrugCombi object (`drugcombi_new`) is already created. Let's create a list of dose configurations for their
+resprective drug combinations. 
+```{r dose-configs-best, echo = TRUE, cache=TRUE}
+all_configs <- rep(list(0:1),  drugcombi_new$getNumberOfDoseLevels(combined = TRUE))  %>%
+        expand.grid()
+all_configs <-  lapply(seq_len(nrow(all_configs)), function(i) as.numeric(all_configs[i,]))
+dose_configs_new <-lapply(all_configs,
+    function(x) createDoseConfig(drugCombiObject = drugcombi_new, isNonDecreasing = FALSE, currentConfig = as.numeric(x))
 )
-# Check if the configuration is valid
-is_valid <- pipe_estimator$isValidConfiguration(gammaConfigs)
-print(is_valid)
 ```
 
-## PatientDataModel Constructor
+Subset all dose configs to get only the valid (i.e. monotonic) ones
+```{r, echo = TRUE}
+dose_configs_valid <- purrr::keep(dose_configs_new, ~ any(.x$isValid ==TRUE))
+```
+
+## PIPE Estimator Class
+The PIPE Estimator Constructor `PipeEstimator` takes a list of valid dose configurations, i.e. `DoseConfiguration` objects, 
+and evaluate the posterior gain of each configuration and output the dose confiuration that maximises the gain.
+The tuning parameters `epsilon` and `weight` can be fixed or adaptive at each update.
+
+```{r, echo = TRUE}
+pipe_hat <- PipeEstimator(dose_configs_valid, epsilon = 0.05)
+```
+
+## PatientDataModel Class
 
 Assuming `drug_dose_obj` is an instance of DrugDose with valid dose levels for each drug
 
 Create a PatientDataModel object:
 ```{r, echo = TRUE}
 patientDataModel <- createPatientDataModel(drugcombi_new)
+```
 
-# Add patient data with dose levels for each drug
-patientDataModel$addPatientData(doseCombination = "Low-d1", outcome = 0)
-patientDataModel$addPatientData(doseCombination = "Low-d2", outcome = 1)
-# ...
 
-# Get summary statistics for each dose level combination
+We can add individual patient with dose levels for each drug with their respective outcome into the trial.
+```{r, echo = TRUE}
+patientDataModel$addPatientData(doseCombination = "Low.d1", outcome = 0)
+patientDataModel$addPatientData(doseCombination = "Medium.d2", outcome = 1)
+patientDataModel$addPatientData(doseCombination = "Medium.d1", outcome = 1)
+
+```
+
+Summary statistics for each dose level combination can be printed for furhter processing.
+We can toggle between printing all dose levels or only those onto which patients enrolled.
+
+```{r}
 summaryStats <- patientDataModel$getSummaryStats(includeAllCombi = FALSE)
-print(summaryStats)
-
-# Define maximum dose levels for each drug
-maxDoseLevel <- "Medium-d3"
-
-# Generate random patient data
-patientDataModel$generateRandomPatientData(maxDoseLevel, numPatients = 10, outcomeProb = 0.3)
-
-# View generated data
-print(patientDataModel$patientData)
-
-summaryStats <- patientDataModel$getSummaryStats(includeAllCombi = TRUE)
 print(summaryStats)
 ```
 
-## DrugCombinationModel Constructor
+There is also method implemented to randomly generate patient data up to a dose combination level.
+
+```{r}
+# Define maximum dose levels for each drug
+maxDoseLevel <- "Medium.d2"
+
+# Generate random patient data
+patientDataModel$generateRandomPatientData(maxDoseLevel, numPatients = 14, outcomeProb = 0.01)
+```
+
+```{r}
+patientDataModel$patientData %>% mutate(PatientID = 1:nrow(patientDataModel$patientData)) %>%
+    kbl(caption = "Patient overview") %>%
+    kable_classic(full_width = F, html_font = "Cambria")
+```
+
+```{r}
+summaryStats <- patientDataModel$getSummaryStats(includeAllCombi = TRUE)
+
+bind_rows(summaryStats, .id = "Dose Levels") %>% 
+    kbl(caption = "Patient overview with summary statistics") %>%
+    kable_classic(full_width = F, html_font = "Cambria")
+```
+
+## Drug Combination Model Class
+The `DrugCombinationModel` constructor allows the initialisation and update of the statistical model used for each
+drug combination level. Depending on the model (currently only binomial and normal distribution for binary and continuous outcomes, respectively)
+, it reads in prior information, including hyperparameters, from a YAML file, and update the posterior of interest based on the patient data that are
+fed into the model.
+The `updateModel()` method 
 ```{r, echo = TRUE}
 # Create a DrugCombinationModel object
 drugCombinationModel <- createDrugCombinationModel("./src/drugPrior.yaml")
 
 # Update the model based on patient data
-updatedModel <- drugCombinationModel$updateModel(patientDataModel)
+updatedModel_posterior <- drugCombinationModel$updateModel(patientDataModel)
 
-# View updated model statistics
-print(updatedModel)
+#View updated model statistics
+bind_rows(updatedModel, .id = "Dose Levels") %>% 
+    kbl(caption = "For illustration: posterior probability of experiencing DLT at each dose combination level") %>%
+    kable_classic(full_width = F, html_font = "Cambria")
+```
+
+# PIPE estimator update
+```{r, echo = TRUE}
+# Get names from the drug combination levels
+relevant_names <- names(drugcombi_new$getDoseCombinationsLevel())
+# Re-order the updatedModel_posterior list
+relevant_posterior <- updatedModel_posterior[relevant_names]
+# Assuming each element in relevant_posterior is a list that contains probTheta, extract them
+p_posterior <- sapply(relevant_posterior, function(x) x$probTheta)
+```
+Once the posterior for the parameter of interest is calculated, we can then pass it onto the `PipeEstimator` to update
+the posterior gain to select the best config so far
+```{r, echo = TRUE}
+temp<- pipe_hat$updatePipeEstimator(p_posterior)
+```
+We can illustrate the current configuration (for a two-drug combination) in a plot
+
+```{r, echo = FALSE}
+pipe_hat$plot(p_posterior)
+```
+
+# Conducting a dual-agent dose-escalation trial using PIPE design
+## Initialisation
+Let us first define the dose levels for each drug under investigation in the trial. 
+This can be done either through reading information from a YAML file with specific dose levels, or initialised without.
+
+```{r, echo = TRUE}
+num_doses_a <- 4
+num_doses_b <- 4
+drugA <- createDrug(name = 'drugA', doseCount = num_doses_a)
+drugB <- createDrug(name = 'drugB', doseCount = num_doses_b)
+drug_list <- list(drugA, drugB)
+```
+
+Once we have initalised the two drugs, we can combine them to create the drug combination object with combined dose levels.
+```{r, echo = TRUE}
+drugcombi_new <- DrugCombi$new(drugs = drug_list) 
+print(drugcombi_new$getDoseCombinationsLevel())
+```
+We will then set up the PIPE configurations and find the set of configurations that fulfills the partial-order constraint.
+Note that we would like our dose configuration to be equal to 1 if it the dose level is acceptable, and 0 otherwise.
+This means that we will set `isNonDecreasing = FALSE` for non-increasing configurations.
+```{r new, echo = TRUE, cache=TRUE}
+all_configs <- rep(list(0:1),  drugcombi_new$getNumberOfDoseLevels(combined = TRUE))  %>%
+        expand.grid()
+all_configs <-  lapply(seq_len(nrow(all_configs)), function(i) as.numeric(all_configs[i,]))
+dose_configs_new <-lapply(all_configs,
+    function(x) createDoseConfig(drugCombiObject = drugcombi_new, isNonDecreasing = FALSE, currentConfig = as.numeric(x))
+)
+dose_configs_valid <- purrr::keep(dose_configs_new, ~ any(.x$isValid ==TRUE))
+```
+The PIPE estimator is initialised with $weight = 1$ and $ \epsilon = 0.05$.
+```{r, echo = TRUE}
+pipe_hat <- PipeEstimator(dose_configs_valid, epsilon = 0.05)
+```
+
+The final step of the initialisation is to set up the trial object as well as the model for each dose level.
+```{r, echo = TRUE}
+patientDataModel <- createPatientDataModel(drugcombi_new)
+```
+Drug model can be initialised with a configuration file. Here we are setting up for binary DLT outcome with prior $a = b = 0.5$ for all dose combination levels.
+```{r, echo = TRUE}
+# Create a DrugCombinationModel object
+drugCombinationModel <- createDrugCombinationModel("./src/drugPrior.yaml")
+```
+
+## Trial Conduct
+### Patient dose level assignment
+```{r, echo = TRUE}
+current_dose_level <- "dose1.dose1"
+cohort_size <- 3
+```
+
+We will start the trial by enrolling patients in cohorts of `r cohort_size` onto a dose level, initially set as the lowest dose level `r current_dose_level`. 
+```{r, echo = TRUE}
+for (i in seq(1, cohort_size)){
+    patientDataModel$addPatientData(doseCombination = current_dose_level, outcome = 0)
+}
+```
+
+### Update posterior probability for DLT
+```{r, echo = TRUE}
+# Update the model based on patient data
+updatedModel_posterior <- drugCombinationModel$updateModel(patientDataModel)
+# Get names from the drug combination levels
+relevant_names <- names(drugcombi_new$getDoseCombinationsLevel())
+# Re-order the updatedModel_posterior list
+relevant_posterior <- updatedModel_posterior[relevant_names]
+# Assuming each element in relevant_posterior is a list that contains probTheta, extract them
+p_posterior <- sapply(relevant_posterior, function(x) x$probTheta)
+```
+
+### Update PIPE estimator
+```{r, echo = TRUE}
+temp <- pipe_hat$updatePipeEstimator(p_posterior)
+```
+We can illustrate the current configuration (for a two-drug combination) in a plot
+```{r, echo = FALSE}
+pipe_hat$plot(p_posterior)
 ```

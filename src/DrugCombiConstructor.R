@@ -33,11 +33,12 @@ DrugCombi <- setRefClass(
             # Creating combination names and mapping to numeric levels
             combinedNames <- apply(labelCombinations, 1, paste, collapse = ".")
 
-            # Assigning row numbers as unique identifiers for each combination
-            combinationIDs <- seq_len(nrow(levelCombinations))
-
             # Mapping each label combination to its corresponding numeric levels
             levelCombinations <- expand.grid(levelsList, stringsAsFactors = FALSE)
+
+            # Assigning row numbers as unique identifiers for each combination
+            combinationIDs <- seq_len(nrow(levelCombinations))
+            
             combinedLevels <- apply(levelCombinations, 1, function(x) as.numeric(x))
 
             # Storing combinations in doseCombinations

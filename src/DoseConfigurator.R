@@ -12,10 +12,11 @@ DoseConfiguration <- setRefClass("DoseConfiguration",
                 # This can be set to a default DrugDose object or keep it as NULL
                 # Example: drugDose <<- DrugDose$new() or drugDose <<- NULL
                 drugCombi <<- DrugCombi$new()  # or any other default initialization
+                currentConfig <<- numeric(length = length(drugCombi$doseCombinations))
             } else {
                 drugCombi <<- drugCombiObject
+                currentConfig <<- currentConfig
             }
-            currentConfig <<- numeric(length = length(drugCombi$doseCombinations))
             isNonDecreasing <<- isNonDecreasing
             isValid <<- .self$isValidConfiguration()
         },
@@ -83,4 +84,9 @@ checkMonotonicity <- function(currentConfig, drugCombi, increasing = TRUE) {
     }
     
     return(TRUE)
+}
+
+# Function to create a new PipeEstimator object
+createDoseConfig <- function(drugCombiObject = NULL, isNonDecreasing = TRUE, currentConfig = NULL) {
+    return(DoseConfiguration$new(drugCombiObject, isNonDecreasing, currentConfig))
 }
