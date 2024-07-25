@@ -1,21 +1,27 @@
 PatientDataModel <- setRefClass("PatientDataModel",
     fields = list(
         drugCombi = "DrugCombination",   # The DrugDose object
-        patientData = "data.frame"  # Data frame to store patient level data
+        patientData = "data.frame",  # Data frame to store patient level data        
+        admissibleRule = "list",
+        selectionStrategy = "list",
+        currentCohort = "numeric"
     ),
     methods = list(
-        initialize = function(drugCombiObject) {
+        initialize = function(drugCombiObject, admissibleRuleList = list(), selectionStrategyList = list()) {
             drugCombi <<- drugCombiObject
             patientData <<- data.frame(doseCombination = I(list()), outcome = numeric(), stringsAsFactors = FALSE)
+            admissibleRule <<- admissibleRuleList
+            selectionStrategy <<- selectionStrategyList
+            currentCohort <<- 1
         },
-        addPatientData = function(doseCombination, outcome) {
+        addPatientData = function(doseCombination, outcome, cohort) {
             # Validate doseCombination
             if (!isDoseCombinationValid(doseCombination)) {
                 stop("Invalid dose combination.")
             }
 
             # Adds patient data to the model
-            patientData <<- rbind(patientData, data.frame(doseCombination = I(list(doseCombination)), outcome = outcome))
+            patientData <<- rbind(patientData, data.frame(doseCombination = I(list(doseCombination)), outcome = outcome, cohort))
         },
         isDoseCombinationValid = function(doseCombination) {
             # Check if each dose is valid for its corresponding drug
@@ -29,38 +35,87 @@ PatientDataModel <- setRefClass("PatientDataModel",
             summaryStats <- tapply(patientData$outcome, sapply(patientData$doseCombination, toString), function(x) {
                 list(numPatients = length(x), numAdverseEvents = sum(x))
             })
-            if (includeAllCombi){
-                missingCombinations <- setdiff(names(drugCombi$doseCombinations), names(summaryStats))
-                summaryStats[missingCombinations] <- lapply(missingCombinations, function(x) {
-                    list(numPatients = 0, numAdverseEvents = 0)
-                })
-            }
+            if (includeAllCombi) {
+                # Initialize all combinations with (numPatients = 0, numAdverseEvents = 0)
+                allCombinations <- setNames(lapply(names(drugCombi$doseCombinations), function(x) list(numPatients = 0, numAdverseEvents = 0)), names(drugCombi$doseCombinations))
+                # Update the initialized combinations with actual data where available
+                summaryStats <- modifyList(allCombinations, summaryStats)
+            } 
             return(summaryStats)
         },
-        generateRandomPatientData = function(maxDoseLevel, numPatients, outcomeProb = 0.5) {
-            # maxDoseLevels: A maximum dose labels for the drug combination
+        generateRandomPatientData = function(doseLevel, numPatients, outcomeProb = 0.5) {
+            # doseLevels: A dose labels for the drug combination
             # numPatients: Number of random patients to generate
             # outcomeProb: Probability of adverse event (default 0.5)
             for (i in 1:numPatients) {
-                if (.self$isDoseCombinationValid(maxDoseLevel)){
-                    validLevels_numeric <- drugCombi$getDoseCombinationsLevel(maxDoseLevel)
-                    validLevels <- names(drugCombi$doseCombinations[drugCombi$getDoseCombinationsLevel() <= validLevels_numeric])
-                        if (length(validLevels) == 0) {
-                            stop("Invalid max dose level for drug: ", drugName)
-                        }
-                        doseCombinationSelected <- sample(validLevels, 1)                
+                if (.self$isDoseCombinationValid(doseLevel)){
+                    # generate probabilistic outcome
+                    outcome <- rbinom(1, 1, outcomeProb)
+                    # Add generated patient data
+                    addPatientData(doseCombination = doseLevel, outcome = outcome, cohort = currentCohort)
                 }
-                # Determine outcome based on specified probability
-                outcome <- rbinom(1, 1, outcomeProb)
-
-                # Add generated patient data
-                addPatientData(doseCombination = doseCombinationSelected, outcome = outcome)
             }
-        }       
+            currentCohort <<- currentCohort + 1
+        },
+        getNextDoseLevel = function(currentLevel, valid_dose_config, drugCombiModel) {
+            admissibleDoses <- lapply(admissibleRule, function(rule) rule$isAdmissible(valid_dose_config, currentLevel, drugCombiModel))
+
+            #### Manually coded section, needs update later ###  
+            admissibleDoses_neighbour_safe <- intersect(admissibleDoses[[2]], admissibleDoses[[3]])
+            if (length(intersect(admissibleDoses[[1]], admissibleDoses_neighbour_safe)) == 0) {
+                admissibleDoses_final <- admissibleDoses_neighbour_safe
+            } else {
+                admissibleDoses_final <- intersect(admissibleDoses[[2]], admissibleDoses_neighbour_safe)
+            }
+            # Apply the selection strategy to choose the next dose
+            if (length(admissibleDoses_final) > 0) {
+                summaryStats <- .self$getSummaryStats(includeAllCombi = TRUE)
+                nextDose <- selectionStrategy[[1]]$selectDose(admissibleDoses_final, summaryStats, drugCombiModel)
+                return(nextDose)
+            } else {
+                stop("No admissible doses found based on the current rules.")
+            }
+        },
+        getRP2D = function(doseConfig, drugCombiModel) {
+            n_dose_level <- drugCombiModel$getNumberOfDoseLevels()
+            dose_closest <- find_closest_to_boundary(doseConfig$bestConfigs$currentConfig,n_dose_level[1], n_dose_level[2])
+            dose_tried <- drugCombiModel$getDoseCombinationsLevel(unique(unlist(patientData$doseCombination)))
+
+            if (length(intersect(dose_tried, dose_closest)) == 0){
+                cat('No RP2D found.\n')
+                return(NA)
+            }
+            else{
+                return(intersect(dose_tried, dose_closest))
+            }
+        }
     )
 )
 
 # Function to create a new PatientDataModel object
-createPatientDataModel <- function(drugDoseObject) {
-    return(PatientDataModel$new(drugDoseObject))
+createPatientDataModel <- function(drugDoseObject, admissibleRuleList=list(), selectionStrategyList=list()) {
+    return(PatientDataModel$new(drugDoseObject, admissibleRuleList, selectionStrategyList))
+}
+
+find_closest_to_boundary <- function(vectorized_matrix, nrow, ncol) {
+  # Reshape the vectorized matrix into a 2D matrix
+  matrix_2d <- matrix(vectorized_matrix, nrow = nrow, ncol = ncol, byrow = TRUE)
+  
+  # Function to check if an element is close to boundary
+  is_close_to_boundary <- function(i, j) {
+    neighbours <- c(
+      if (i > 1) matrix_2d[i - 1, j] else NA,    # Up
+      if (i < nrow) matrix_2d[i + 1, j] else NA, # Down
+      if (j > 1) matrix_2d[i, j - 1] else NA,    # Left
+      if (j < ncol) matrix_2d[i, j + 1] else NA  # Right
+    )
+    any(neighbours == 1, na.rm = TRUE)
+  }
+  
+  # Find linear indices of 0s close to the boundary
+  closest_indices <- which(matrix_2d == 0 & apply(expand.grid(1:nrow, 1:ncol), 1, function(idx) {
+    is_close_to_boundary(idx[1], idx[2])
+  }))
+  
+  return(closest_indices)
 }

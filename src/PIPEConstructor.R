@@ -3,6 +3,7 @@ PipeEstimator <- setRefClass("PipeEstimator",
 #       trial = "PatientDataModel", # The Trial object
         validConfigs = "list",  # List of valid configurations of dose levels
         bestConfigs = "DoseConfiguration", # one of the valid configurations
+        validConfigs_posterior = "list", # posterior estimate for all valid configs
         epsilon = "numeric", # parameter indicating the mixing rate
         weight = "numeric" # parameter set for each dose level
     ),
@@ -27,6 +28,7 @@ PipeEstimator <- setRefClass("PipeEstimator",
                 validConfigs, 
                 function(validConfiguration) {logGain(p_posterior, epsilon, weight, validConfiguration$currentConfig)}
             )
+            validConfigs_posterior <<- log_gain_list
             bestConfigs <<- validConfigs[[which.max(log_gain_list)]]
 
         return(log_gain_list)
@@ -39,7 +41,7 @@ PipeEstimator <- setRefClass("PipeEstimator",
             epsilon <<- epsilonNew
         },
         plot = function(p_posterior = NULL){
-            acceptable_doses <- ifelse(bestConfigs$currentConfig == 1, 'Yes', 'No')
+            acceptable_doses <- ifelse(bestConfigs$currentConfig == 0, 'Yes', 'No')
             dose_levels <- names(bestConfigs$drugCombi$getDoseCombinationsLevel())
             # Split the vector by "." 
             # this currently only works for two drugs
@@ -50,12 +52,12 @@ PipeEstimator <- setRefClass("PipeEstimator",
             }))
 
             df <- cbind(split_df, acceptable_doses, p_posterior) %>% mutate(
-                drug1 = factor(drug1, levels=drug1[1:4]),
+                drug1 = factor(drug1, levels=drug1[1:6]),
                 acceptable_doses = as.factor(acceptable_doses)
                 )
 
             # Create the plot
-            ggplot(df, aes(x = drug1, y = drug2, color = acceptable_doses, size = p_posterior)) +
+            ggplot(df, aes(x = drug2, y = drug1, color = accepble_doses, size = p_posterior)) +
             geom_point(alpha = 0.7, aes(shape = acceptable_doses))+  # Adjust alpha for point transparency if desired
 #            scale_color_gradient(low = "blue", high = "red") +  # Customize color gradient
             theme_minimal() +

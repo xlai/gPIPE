@@ -26,6 +26,7 @@ if (!requireNamespace("yaml", quietly = TRUE)) {
 library(yaml)
 library(kableExtra) # For knitting dataframes
 library(dplyr)
+library(ggplot2)
 ```
 
 ## Reading dose information from a YAML file
@@ -182,29 +183,22 @@ drugCombinationModel <- createDrugCombinationModel("./src/drugPrior.yaml")
 updatedModel_posterior <- drugCombinationModel$updateModel(patientDataModel)
 
 #View updated model statistics
-bind_rows(updatedModel, .id = "Dose Levels") %>% 
+bind_rows(updatedModel_posterior, .id = "Dose Levels") %>% 
     kbl(caption = "For illustration: posterior probability of experiencing DLT at each dose combination level") %>%
     kable_classic(full_width = F, html_font = "Cambria")
 ```
 
 # PIPE estimator update
-```{r, echo = TRUE}
-# Get names from the drug combination levels
-relevant_names <- names(drugcombi_new$getDoseCombinationsLevel())
-# Re-order the updatedModel_posterior list
-relevant_posterior <- updatedModel_posterior[relevant_names]
-# Assuming each element in relevant_posterior is a list that contains probTheta, extract them
-p_posterior <- sapply(relevant_posterior, function(x) x$probTheta)
-```
+
 Once the posterior for the parameter of interest is calculated, we can then pass it onto the `PipeEstimator` to update
 the posterior gain to select the best config so far
 ```{r, echo = TRUE}
-temp<- pipe_hat$updatePipeEstimator(p_posterior)
+temp<- pipe_hat$updatePipeEstimator(updatedModel_posterior)
 ```
 We can illustrate the current configuration (for a two-drug combination) in a plot
 
 ```{r, echo = FALSE}
-pipe_hat$plot(p_posterior)
+#pipe_hat$plot(p_posterior)
 ```
 
 # Conducting a dual-agent dose-escalation trial using PIPE design
@@ -213,8 +207,8 @@ Let us first define the dose levels for each drug under investigation in the tri
 This can be done either through reading information from a YAML file with specific dose levels, or initialised without.
 
 ```{r, echo = TRUE}
-num_doses_a <- 4
-num_doses_b <- 4
+num_doses_a <- 6
+num_doses_b <- 6
 drugA <- createDrug(name = 'drugA', doseCount = num_doses_a)
 drugB <- createDrug(name = 'drugB', doseCount = num_doses_b)
 drug_list <- list(drugA, drugB)
@@ -228,54 +222,72 @@ print(drugcombi_new$getDoseCombinationsLevel())
 We will then set up the PIPE configurations and find the set of configurations that fulfills the partial-order constraint.
 Note that we would like our dose configuration to be equal to 1 if it the dose level is acceptable, and 0 otherwise.
 This means that we will set `isNonDecreasing = FALSE` for non-increasing configurations.
-```{r new, echo = TRUE, cache=TRUE}
-all_configs <- rep(list(0:1),  drugcombi_new$getNumberOfDoseLevels(combined = TRUE))  %>%
-        expand.grid()
-all_configs <-  lapply(seq_len(nrow(all_configs)), function(i) as.numeric(all_configs[i,]))
+```{r new, echo = FALSE, cache=FALSE}
+#all_configs <- rep(list(0:1),  drugcombi_new$getNumberOfDoseLevels(combined = TRUE))  %>%
+#        expand.grid()
+#all_configs <-  lapply(seq_len(nrow(all_configs)), function(i) as.numeric(all_configs[i,]))
+all_configs <- monotonic.matrices(6,6)
+all_configs <- lapply(all_configs, function(x)c(x))
 dose_configs_new <-lapply(all_configs,
-    function(x) createDoseConfig(drugCombiObject = drugcombi_new, isNonDecreasing = FALSE, currentConfig = as.numeric(x))
+    function(x) createDoseConfig(drugCombiObject = drugcombi_new, isNonDecreasing = TRUE, currentConfig = as.numeric(x))
 )
 dose_configs_valid <- purrr::keep(dose_configs_new, ~ any(.x$isValid ==TRUE))
 ```
-The PIPE estimator is initialised with $weight = 1$ and $ \epsilon = 0.05$.
+The PIPE estimator is initialised with $weight = 1$ and $\epsilon = 0.5$.
+
 ```{r, echo = TRUE}
-pipe_hat <- PipeEstimator(dose_configs_valid, epsilon = 0.05)
+pipe_hat <- PipeEstimator(dose_configs_valid, epsilon = 0.5)
 ```
 
-The final step of the initialisation is to set up the trial object as well as the model for each dose level.
-```{r, echo = TRUE}
-patientDataModel <- createPatientDataModel(drugcombi_new)
+The rules for determining admissible and safety rules also need to be established:
+```{r, include = FALSE}
+source('./src/strategies/AdmissibleCombinationRule.R')
+source('./src/strategies/admissibleRules/Adjacent.R')
+source('./src/strategies/admissibleRules/Closest.R')
+source('./src/strategies/admissibleRules/Neighbour.R')
+source('./src/strategies/admissibleRules/Safety.R')
+source('./src/strategies/SelectionStrategy.R')
 ```
+```{r, echo = TRUE}
+admissible_rule_list <- list(
+    rule_closet <- ClosestAdmissible$new(),
+    rule_neighbour <- NeighbourAdmissible$new(),
+    rule_safety <- SafetyAdmissible$new()
+)
+selection_rule_list <- list(
+    rule_smallest_ss <- SelectionStrategy$new()
+)
+```
+The final step of the initialisation is to set up the trial object as well as the model for each dose level.
+
 Drug model can be initialised with a configuration file. Here we are setting up for binary DLT outcome with prior $a = b = 0.5$ for all dose combination levels.
 ```{r, echo = TRUE}
 # Create a DrugCombinationModel object
-drugCombinationModel <- createDrugCombinationModel("./src/drugPrior.yaml")
+drugCombinationModel <- createDrugCombinationModel("./src/drugPrior_6level.yaml")
+prob_true <- read.csv('tests/dose_levels_probability.csv')
+prob_true_list <- setNames(as.list(prob_true$probability), prob_true$dose_level)
+```
+
+```{r, echo = TRUE}
+patientDataModel <- createPatientDataModel(drugcombi_new, admissible_rule_list, selection_rule_list)
 ```
 
 ## Trial Conduct
 ### Patient dose level assignment
 ```{r, echo = TRUE}
 current_dose_level <- "dose1.dose1"
-cohort_size <- 3
+cohort_size <- 2
 ```
 
 We will start the trial by enrolling patients in cohorts of `r cohort_size` onto a dose level, initially set as the lowest dose level `r current_dose_level`. 
 ```{r, echo = TRUE}
-for (i in seq(1, cohort_size)){
-    patientDataModel$addPatientData(doseCombination = current_dose_level, outcome = 0)
-}
+patientDataModel$generateRandomPatientData(current_dose_level, cohort_size, outcomeProb = as.numeric(prob_true_list[current_dose_level]))
 ```
 
 ### Update posterior probability for DLT
 ```{r, echo = TRUE}
 # Update the model based on patient data
-updatedModel_posterior <- drugCombinationModel$updateModel(patientDataModel)
-# Get names from the drug combination levels
-relevant_names <- names(drugcombi_new$getDoseCombinationsLevel())
-# Re-order the updatedModel_posterior list
-relevant_posterior <- updatedModel_posterior[relevant_names]
-# Assuming each element in relevant_posterior is a list that contains probTheta, extract them
-p_posterior <- sapply(relevant_posterior, function(x) x$probTheta)
+p_posterior <- drugCombinationModel$updateModel(patientDataModel)
 ```
 
 ### Update PIPE estimator
@@ -286,3 +298,12 @@ We can illustrate the current configuration (for a two-drug combination) in a pl
 ```{r, echo = FALSE}
 pipe_hat$plot(p_posterior)
 ```
+
+### Get next dose according to the escalation strategies
+```{r}
+current_dose_level_numeric <- drugcombi_new$getDoseCombinationsLevel(current_dose_level)
+next_dose_level_numeric <- patientDataModel$getNextDoseLevel(current_dose_level_numeric, pipe_hat, drugCombinationModel)
+next_dose_level <- names(drugcombi_new$getDoseCombinationsLevel(next_dose_level_numeric))
+```
+
+runTrialSimulation('dose1.dose1', 2, 20, prob_true_list, drugCombinationModel, drugcombi_new, pipe_hat, admissible_rule_list, selection_rule_list)
