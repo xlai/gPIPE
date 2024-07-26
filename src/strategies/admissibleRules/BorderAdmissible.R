@@ -6,13 +6,16 @@ BorderAdmissible <- setRefClass(
       # Custom implementation
       best_config <- doseConfig$bestConfigs
       n_dose_level <- best_config$drugCombi$getNumberOfDoseLevels()
-      border_admissable_level <- findBorderIndices(doseConfig$currentConfig, n_dose_level[1], n_dose_level[2])
-      return(order(border_admissable_level))
+      border_admissable_level <- findBorderIndices(best_config$currentConfig, n_dose_level)
+      return(sort(border_admissable_level))
     }
   )
 )
 
-findBorderIndices <- function(vec_mat, nrows, ncols) {
+findBorderIndices <- function(vec_mat, matrixDims) {
+  # Calculate the number of rows and columns from matrixDims
+    ncols <- matrixDims[1]
+    nrows <- matrixDims[2]  
   # Reshape the vector back to a matrix
   mat <- matrix(vec_mat, nrow = nrows, ncol = ncols, byrow = TRUE)
   
