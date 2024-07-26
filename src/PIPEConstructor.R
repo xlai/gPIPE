@@ -57,7 +57,7 @@ PipeEstimator <- setRefClass("PipeEstimator",
                 )
 
             # Create the plot
-            ggplot(df, aes(x = drug2, y = drug1, color = accepble_doses, size = p_posterior)) +
+            ggplot(df, aes(x = drug2, y = drug1, color = acceptable_doses, size = p_posterior)) +
             geom_point(alpha = 0.7, aes(shape = acceptable_doses))+  # Adjust alpha for point transparency if desired
 #            scale_color_gradient(low = "blue", high = "red") +  # Customize color gradient
             theme_minimal() +

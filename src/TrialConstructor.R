@@ -60,12 +60,17 @@ PatientDataModel <- setRefClass("PatientDataModel",
         getNextDoseLevel = function(currentLevel, valid_dose_config, drugCombiModel) {
             admissibleDoses <- lapply(admissibleRule, function(rule) rule$isAdmissible(valid_dose_config, currentLevel, drugCombiModel))
 
-            #### Manually coded section, needs update later ###  
-            admissibleDoses_neighbour_safe <- intersect(admissibleDoses[[2]], admissibleDoses[[3]])
-            if (length(intersect(admissibleDoses[[1]], admissibleDoses_neighbour_safe)) == 0) {
-                admissibleDoses_final <- admissibleDoses_neighbour_safe
+            if (length(admissibleDoses) == 1) {
+                # If the length of admissibleDoses is 1, directly assign it to admissibleDoses_final
+                admissibleDoses_final <- admissibleDoses[[1]]
             } else {
-                admissibleDoses_final <- intersect(admissibleDoses[[2]], admissibleDoses_neighbour_safe)
+            #### Manually coded section, needs update later ###  
+                admissibleDoses_neighbour_safe <- Reduce(intersect, admissibleDoses[-1])
+                if (length(intersect(admissibleDoses[[1]], admissibleDoses_neighbour_safe)) == 0) {
+                    admissibleDoses_final <- admissibleDoses_neighbour_safe
+                } else {
+                    admissibleDoses_final <- intersect(admissibleDoses[[2]], admissibleDoses_neighbour_safe)
+                }
             }
             # Apply the selection strategy to choose the next dose
             if (length(admissibleDoses_final) > 0) {
