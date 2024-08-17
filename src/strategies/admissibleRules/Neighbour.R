@@ -42,5 +42,5 @@ findNearestNeighbours <- function(pointIndex, matrixDims, degree = 1) {
                         neighbourCols[validNeighbours]
     
     # Return the linear indices of the nearest neighbours
-    return(neighbourIndices[neighbourIndices!=pointIndex])
+    return(neighbourIndices)
 }
