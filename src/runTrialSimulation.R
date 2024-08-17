@@ -1,4 +1,4 @@
-runTrialSimulation <- function(starting_dose_level, cohort_size, max_cohorts, prob_true_list, drugCombinationModel, drugcombi_new, pipe_hat, patientDataModel) {
+runTrialSimulation <- function(starting_dose_level, cohort_size, max_cohorts, prob_true_list, drugCombinationModel, drugcombi_new, pipe_hat, patientDataModel, epsilon = 0.05, tapering = TRUE) {
   # Initialise variables
   current_dose_level <- starting_dose_level
   simulation_results <- list()
@@ -16,6 +16,10 @@ runTrialSimulation <- function(starting_dose_level, cohort_size, max_cohorts, pr
     p_posterior <- drugCombinationModel$updateModel(patientDataModel)
     
     # Update PIPE estimator
+    if (tapering == TRUE){
+      epsilon_n <- epsilon_tapering(n_total = cohort_size * max_cohorts, n_current = cohort_size * cohort_count, epsilon)
+      pipe_hat$setEpsilon(epsilon_n)
+    }
     temp <- pipe_hat$updatePipeEstimator(p_posterior)
     
     # Store iteration results
@@ -35,6 +39,9 @@ runTrialSimulation <- function(starting_dose_level, cohort_size, max_cohorts, pr
     
     current_dose_level_numeric <- drugcombi_new$getDoseCombinationsLevel(current_dose_level)
     next_dose_level_numeric <- patientDataModel$getNextDoseLevel(current_dose_level_numeric, pipe_hat, drugCombinationModel)
+    if(is.na(next_dose_level_numeric)){
+      break # Break if no doses found to continue the trial
+    }
     next_dose_level <- names(drugcombi_new$getDoseCombinationsLevel(next_dose_level_numeric))
     
     current_dose_level <- next_dose_level

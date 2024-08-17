@@ -67,19 +67,20 @@ PatientDataModel <- setRefClass("PatientDataModel",
             #### Manually coded section, needs update later ###  
                 admissibleDoses_neighbour_safe <- Reduce(intersect, admissibleDoses[-1])
                 if (length(intersect(admissibleDoses[[1]], admissibleDoses_neighbour_safe)) == 0) {
-                    admissibleDoses_final <- admissibleDoses_neighbour_safe
+                    admissibleDoses_final <- NULL
                 } else {
-                    admissibleDoses_final <- intersect(admissibleDoses[[2]], admissibleDoses_neighbour_safe)
+                    admissibleDoses_final <- intersect(admissibleDoses[[1]], admissibleDoses_neighbour_safe)
                 }
             }
             # Apply the selection strategy to choose the next dose
             if (length(admissibleDoses_final) > 0) {
                 summaryStats <- .self$getSummaryStats(includeAllCombi = TRUE)
                 nextDose <- selectionStrategy[[1]]$selectDose(admissibleDoses_final, summaryStats, drugCombiModel)
-                return(nextDose)
             } else {
-                stop("No admissible doses found based on the current rules.")
+                nextDose <- NA
+                warning("No admissible doses found based on the current rules.")
             }
+            return(nextDose)
         },
         getRP2D = function(doseConfig, drugCombiModel) {
             n_dose_level <- drugCombiModel$getNumberOfDoseLevels()

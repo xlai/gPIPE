@@ -1,7 +1,7 @@
 library(doFuture)
 
 # Parameters for simulation
-num_simulations <- 500
+num_simulations <- 1000
 starting_dose_level <- "dose1.dose1"
 cohort_size <- 2
 max_cohorts <- 20
@@ -24,7 +24,7 @@ simulation_outputs <- foreach(
     drugcombi_new <- DrugCombi$new(drugs=drug_list)     
     drugCombinationModel <- createDrugCombinationModel("./src/drugPrior_6level.yaml")
     patientDataModel <- createPatientDataModel(drugcombi_new, admissible_rule_list, selection_rule_list)
-    pipe_hat <- PipeEstimator(dose_configs_valid, epsilon = 0.05)
+    pipe_hat <- PipeEstimator(dose_configs_valid, epsilon = 0.1)
 
     tryCatch({
       # Call your function with the desired parameters
@@ -57,7 +57,7 @@ for (i in 1:num_simulations) {
       # Call your function with the desired parameters
       runTrialSimulation(starting_dose_level, cohort_size, max_cohorts, 
                         prob_true_list, drugCombinationModel, drugcombi_new, 
-                        pipe_hat, patientDataModel)
+                        pipe_hat, patientDataModel, epsilon = 0.3)
     }, error = function(e) {
       # Handle the case where no admissible dose is found
       if (grepl("No admissible doses found", e$message)) {
@@ -137,13 +137,13 @@ plot_dlt_proportion <- function(sim_output, drugA, drugB, cohort_seq) {
   # Create the plot
   p <- ggplot() +
     geom_tile(data = cumulative_dlt_df, aes(x = as.numeric(Drug1), y = as.numeric(Drug2), fill = cumulative_DLT_proportion), color = "white", alpha = 0.5, size = 2) +
-    geom_step(aes(x = x, y = y), data = step_data, size = 1.5, color = "black", linetype = 2) +
+    geom_step(aes(x = x, y = y), data = step_data, linewidth = 1.5, color = "black", linetype = 2) +
     scale_fill_gradientn(colors = rev(RColorBrewer::brewer.pal(11, "RdYlGn")),
                          limits = c(0, 1),
                          na.value = 'white',
                          name = "DLT Proportion") +
-    scale_x_continuous(breaks = 1:6, labels = levels(cumulative_dlt_df$Drug1), expand = c(0, 0)) +
-    scale_y_continuous(breaks = 1:6, labels = levels(cumulative_dlt_df$Drug2), expand = c(0, 0)) +
+    scale_x_continuous(breaks = 1:6, labels = levels(cumulative_dlt_df$Drug1), limits = c(0, 7), expand = c(0, 0)) +
+    scale_y_continuous(breaks = 1:6, labels = levels(cumulative_dlt_df$Drug2), limits = c(0, 7), expand = c(0, 0)) +
     geom_text(data = cumulative_dlt_df, aes(x = as.numeric(Drug1), y = as.numeric(Drug2), label = paste(cumulative_count, "(", cumulative_DLT, ")", sep = "")), color = "black") +
     labs(x = "Drug 1", y = "Drug 2") +
     theme_minimal() +
@@ -157,24 +157,24 @@ plot_dlt_proportion <- function(sim_output, drugA, drugB, cohort_seq) {
 # For animation, create a list of plots for each cohort sequence
 cohort_seqs <- 1:20  # Example sequence
 plots <- lapply(cohort_seqs, function(cohort_seq) {
-  plot_dlt_proportion(simulation_results[[189]], drugA, drugB, cohort_seq)
+  plot_dlt_proportion(simulation_results[[90]], drugA, drugB, cohort_seq)
 })
 # Extract the legend from one of the plots
-legend <- get_legend(plots[[1]] + theme(legend.position = "bottom"))
+legend <- cowplot::get_legend(plots[[1]] + theme(legend.position = "bottom"))
 
 # Remove legends from all plots
 plots <- lapply(plots, function(plot) plot + theme(legend.position = "none" ))
 
 # Combine plots into a single page using cowplot
-combined_plot <- plot_grid(plotlist = plots, ncol = 4, align = 'v')
+combined_plot <- cowplot::plot_grid(plotlist = plots, ncol = 4, align = 'v')
 
 # Add a common title
-title <- ggdraw() + draw_label("Cumulative DLT Proportion by Dose Combination", fontface = 'bold')
+title <- cowplot::ggdraw() + cowplot::draw_label("Cumulative DLT Proportion by Dose Combination", fontface = 'bold')
 
 # Combine title, legend, and plots
-final_plot <- plot_grid(title, combined_plot, legend, ncol = 1, rel_heights = c(0.1, 1, 0.1))
+final_plot <- cowplot::plot_grid(title, combined_plot, legend, ncol = 1, rel_heights = c(0.1, 1, 0.1))
 
-ggsave(final_plot, file = '~/Downloads/pipe_plot.pdf', height = 40, width = 30)
+ggsave(final_plot, file = '~/Downloads/pipe_plot_eps_0.3.pdf', height = 40, width = 30)
 
 
 # Combine the plots into an animation
@@ -207,13 +207,17 @@ create_summary_table <- function(prob_true_list, target_DLT_prob, indifference_i
     paste0("(", intervals[i], ",", intervals[i+1], "]")
   })
   
-  # Map dose combinations to their true DLT probabilities
-  dose_probs <- setNames(as.numeric(prob_true_list), names(prob_true_list))
-  
+  # Map dose combinations to their true DLT probabilities to a data frame
+  dose_probs_df <- data.frame(
+    doseCombination = names(prob_true_list),
+    DLT_prob = as.numeric(prob_true_list),
+    stringsAsFactors = FALSE
+  )
+
   # Add true DLT probabilities to patientData based on dose combinations
-  patientData <- patientData %>%
-    mutate(DLT_prob = dose_probs[doseCombination],
-           Interval = cut(DLT_prob, breaks = intervals, labels = interval_labels, right = TRUE))
+  patientData <- patientData %>% mutate(doseCombination = as.character(doseCombination)) %>%
+    left_join(., dose_probs_df, by = "doseCombination") %>%
+    mutate(Interval = cut(DLT_prob, breaks = intervals, labels = interval_labels, right = TRUE))
   
   return(patientData)
 }
@@ -246,3 +250,8 @@ average_summary_across_simulations <- function(simulation_results, prob_true_lis
 
 average_summary <- average_summary_across_simulations(simulation_results, prob_true_list, 0.3, 0.1)
 
+epsilon_tapering <- function(n_total, n_current, epsilon){
+  epsilon_current <- (n_total - n_current)/(n_total + 1)*0.5 + (n_current + 1)/(n_total + 1)*epsilon
+
+  return(epsilon_current)
+}
