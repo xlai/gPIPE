@@ -12,34 +12,12 @@ BorderAdmissible <- setRefClass(
   )
 )
 
-findBorderIndices <- function(vec_mat, matrixDims) {
-  # Calculate the number of rows and columns from matrixDims
-    ncols <- matrixDims[1]
-    nrows <- matrixDims[2]  
-  # Reshape the vector back to a matrix
-  mat <- matrix(vec_mat, nrow = nrows, ncol = ncols, byrow = TRUE)
+findBorderIndices <- function(A, matrixDims) {
+  # Step 1: Calculate the neighbour sum
+  neighbour_sum <- calculateNeighbourSum(A, matrixDims)
   
-  # Function to convert (i, j) to linear index
-  linear_index <- function(i, j, ncols) {
-    return((i - 1) * ncols + j)
-  }
-  
-  # Identify row-wise transitions from 0 to 1
-  row_transitions <- which(mat[, -ncols] == 0 & mat[, -1] == 1, arr.ind = TRUE)
-  row_indices <- unique(c(
-    linear_index(row_transitions[, 1], row_transitions[, 2], ncols),
-    linear_index(row_transitions[, 1], row_transitions[, 2] + 1, ncols)
-  ))
-  
-  # Identify column-wise transitions from 0 to 1
-  col_transitions <- which(mat[-nrows, ] == 0 & mat[-1, ] == 1, arr.ind = TRUE)
-  col_indices <- unique(c(
-    linear_index(col_transitions[, 1], col_transitions[, 2], ncols),
-    linear_index(col_transitions[, 1] + 1, col_transitions[, 2], ncols)
-  ))
-  
-  # Combine and return unique indices
-  border_indices <- unique(c(row_indices, col_indices))
-  
-  return(border_indices)
+  # Step 2: Identify the indices where the neighbour sum is between 1 and 3
+  indices <- which(neighbour_sum > 0  & neighbour_sum < 4)
+
+  return(indices)
 }
