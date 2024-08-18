@@ -82,18 +82,31 @@ PatientDataModel <- setRefClass("PatientDataModel",
             }
             return(nextDose)
         },
-        getRP2D = function(doseConfig, drugCombiModel) {
+        getMTD = function(doseConfig){
             n_dose_level <- drugCombiModel$getNumberOfDoseLevels()
-            dose_closest <- find_closest_to_boundary(doseConfig$bestConfigs$currentConfig,n_dose_level[1], n_dose_level[2])
-            dose_tried <- drugCombiModel$getDoseCombinationsLevel(unique(unlist(patientData$doseCombination)))
-
-            if (length(intersect(dose_tried, dose_closest)) == 0){
+            # Calculate the neighbour sum using the provided function
+            neighbour_sum <- calculateNeighbourSum(A, matrixDims)
+            mtd_indices <- which(neighbour_sum == 2 & doseConfig == 1)
+            if (length(mtd_indices) == 0){
+                cat('No MTD found.\n')
+                return(NA)
+            }
+            else{
+                return(mtd_indices)
+            }            
+        },
+        getRP2D = function(doseConfig){
+            n_dose_level <- drugCombiModel$getNumberOfDoseLevels()
+            # Calculate the neighbour sum using the provided function
+            neighbour_sum <- calculateNeighbourSum(A, matrixDims)
+            rp2d_indices <- which(neighbour_sum == 2 & doseConfig == 0)
+            if (length(rp2d_indices) == 0){
                 cat('No RP2D found.\n')
                 return(NA)
             }
             else{
-                return(intersect(dose_tried, dose_closest))
-            }
+                return(rp2d_indices)
+            }                    
         }
     )
 )
