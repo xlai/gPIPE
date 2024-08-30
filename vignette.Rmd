@@ -9,6 +9,8 @@ knitr::opts_chunk$set(echo = TRUE)
 path_to_source <- "./src/"
 files_to_source <- list.files(path = path_to_source, pattern = '*.R')
 sapply(files_to_source, function(x) source(paste0(path_to_source, x )))
+source('src/utils/epsilon_tapering.R')
+source('src/utils/calculate_neighbour_sum.R')
 ```
 
 # Introduction
@@ -116,7 +118,7 @@ and evaluate the posterior gain of each configuration and output the dose confiu
 The tuning parameters `epsilon` and `weight` can be fixed or adaptive at each update.
 
 ```{r, echo = TRUE}
-pipe_hat <- PipeEstimator(dose_configs_valid, epsilon = 0.05)
+pipe_hat <- PipeEstimator(dose_configs_valid, epsilon = 0.1)
 ```
 
 ## PatientDataModel Class
@@ -242,20 +244,26 @@ pipe_hat <- PipeEstimator(dose_configs_valid, epsilon = 0.5)
 The rules for determining admissible and safety rules also need to be established:
 ```{r, include = FALSE}
 source('./src/strategies/AdmissibleCombinationRule.R')
-source('./src/strategies/admissibleRules/Adjacent.R')
-source('./src/strategies/admissibleRules/Closest.R')
-source('./src/strategies/admissibleRules/Neighbour.R')
-source('./src/strategies/admissibleRules/Safety.R')
+source('./src/strategies/admissibleRules/BorderAdmissible.R')
 source('./src/strategies/SelectionStrategy.R')
+path_to_source <- "./src/strategies/selectionStrategies/"
+files_to_source <- list.files(path = path_to_source, pattern = '*.R')
+sapply(files_to_source, function(x) source(paste0(path_to_source, x )))
 ```
 ```{r, echo = TRUE}
 admissible_rule_list <- list(
-    rule_closet <- ClosestAdmissible$new(),
-    rule_neighbour <- NeighbourAdmissible$new(),
-    rule_safety <- SafetyAdmissible$new()
+#    rule_closet <- ClosestAdmissible$new(),
+    rule_border <- BorderAdmissible$new()
+#    rule_neighbour <- NeighbourAdmissible$new()
+#    rule_safety <- SafetyAdmissible$new()
+
 )
 selection_rule_list <- list(
-    rule_smallest_ss <- SelectionStrategy$new()
+    rule_equal_ss <- EqualRandomisationStrategy$new()
+#    rule_smallest_ss <- SmallestSampleSizeStrategy$new()
+#    rule_inv_sqrt_ss <- InverseSqrtSampleSizeStrategy$new()
+#    rule_posterior_ss <- PosteriorProbabilityStrategy$new()
+#    rule_inv_dist_ss <- InverseDistanceStrategy$new()            
 )
 ```
 The final step of the initialisation is to set up the trial object as well as the model for each dose level.
@@ -263,8 +271,8 @@ The final step of the initialisation is to set up the trial object as well as th
 Drug model can be initialised with a configuration file. Here we are setting up for binary DLT outcome with prior $a = b = 0.5$ for all dose combination levels.
 ```{r, echo = TRUE}
 # Create a DrugCombinationModel object
-drugCombinationModel <- createDrugCombinationModel("./src/drugPrior_6level.yaml")
-prob_true <- read.csv('tests/dose_levels_probability.csv')
+drugCombinationModel <- createDrugCombinationModel("./src/drugPrior.yaml")
+prob_true <- read.csv('tests/dose_levels_probability_riviere.csv')
 prob_true_list <- setNames(as.list(prob_true$probability), prob_true$dose_level)
 ```
 
