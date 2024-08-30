@@ -62,7 +62,7 @@ checkMonotonicity <- function(currentConfig, drugCombi, increasing = TRUE) {
     numDims <- length(numDoseLevels)
     indices <- drugCombi$getDoseCombinationsLevel()
     # Create an array to store the gamma values, initialised with 0
-    gammaArray <- array(currentConfig, dim = numDoseLevels)
+    gammaArray <- matrix(currentConfig, ncol = numDoseLevels[1], byrow = FALSE)
     
     # Pre-compute slices for each dimension
     slices <- slice_array_by_dimension(gammaArray)
@@ -76,7 +76,7 @@ checkMonotonicity <- function(currentConfig, drugCombi, increasing = TRUE) {
 
     # Check monotonicity in each dimension
     for (d in 1:numDims) {
-        for (index in 1:(numDoseLevels[d] - 1)) {
+        for (index in 1:(numDoseLevels[-d] - 1)) {
             if (compare(slices[[d]][[index]], slices[[d]][[index + 1]])) {
                 return(FALSE)
             }
