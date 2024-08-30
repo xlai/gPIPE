@@ -1,4 +1,4 @@
-runTrialSimulation <- function(starting_dose_level, cohort_size, max_cohorts, prob_true_list, drugCombinationModel, drugcombi_new, pipe_hat, patientDataModel, epsilon = 0.05, tapering = TRUE) {
+runTrialSimulation <- function(starting_dose_level, cohort_size, max_cohorts, prob_true_list, drugCombinationModel, drugcombi_new, pipe_hat, patientDataModel, epsilon = 0.05, taper_type = 'quadratic') {
   # Initialise variables
   current_dose_level <- starting_dose_level
   simulation_results <- list()
@@ -16,8 +16,8 @@ runTrialSimulation <- function(starting_dose_level, cohort_size, max_cohorts, pr
     p_posterior <- drugCombinationModel$updateModel(patientDataModel)
     
     # Update PIPE estimator
-    if (tapering == TRUE){
-      epsilon_n <- epsilon_tapering(n_total = cohort_size * max_cohorts, n_current = cohort_size * cohort_count, epsilon)
+    if (!is.null(taper_type)){
+      epsilon_n <- epsilon_tapering(n_total = cohort_size * max_cohorts, n_current = cohort_size * cohort_count, epsilon, taper_type = taper_type)
       pipe_hat$setEpsilon(epsilon_n)
     }
     temp <- pipe_hat$updatePipeEstimator(p_posterior)
@@ -49,11 +49,13 @@ runTrialSimulation <- function(starting_dose_level, cohort_size, max_cohorts, pr
   
   # Capture final patient data and RP2D
   final_patient_data <- patientDataModel$patientData
-  RP2D <- patientDataModel$getRP2D(pipe_hat, drugcombi_new)
+  RP2D <- patientDataModel$getRP2D(pipe_hat$bestConfigs$currentConfig, drugcombi_new)
+  MTD <- patientDataModel$getMTD(pipe_hat$bestConfigs$currentConfig, drugcombi_new)
   
   return(list(
     simulation_results = simulation_results,
     final_patient_data = final_patient_data,
-    RP2D = RP2D
+    RP2D = RP2D,
+    MTD = MTD
   ))
 }
