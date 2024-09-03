@@ -11,8 +11,8 @@ epsilon_tapering <- function(n_total, n_current, epsilon, taper_type = "linear",
                          (n_current + 1) / (n_total + 1) * epsilon
     } else if (taper_type == "quadratic") {
       # Quadratic tapering: slow down tapering at the beginning
-      alpha <- (n_current / n_total) ^ 2
-      epsilon_current <- (1 - alpha) * 0.5 + alpha * epsilon
+      alpha <- n_current / n_total
+      epsilon_current <- (1 - alpha)^2 * 0.5 + alpha^2 * epsilon
     } else {
       stop("Unsupported taper_type. Please use 'linear', 'quadratic', or provide a custom taper function.")
     }
