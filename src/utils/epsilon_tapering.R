@@ -1,6 +1,10 @@
-
-epsilon_tapering <- function(n_total, n_current, epsilon, taper_type = "linear", custom_taper = NULL) {
+epsilon_tapering <- function(n_total, n_current, epsilon, taper_type = NULL, custom_taper = NULL) {
   
+  # Check if both taper_type and custom_taper are NULL
+  if (is.null(taper_type) && is.null(custom_taper)) {
+    return(epsilon)
+  }
+
   if (!is.null(custom_taper)) {
     # Use the custom tapering function provided by the user
     epsilon_current <- custom_taper(n_total, n_current, epsilon)
