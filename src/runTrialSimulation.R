@@ -16,10 +16,9 @@ runTrialSimulation <- function(starting_dose_level, cohort_size, max_cohorts, pr
     p_posterior <- drugCombinationModel$updateModel(patientDataModel)
     
     # Update PIPE estimator
-    if (!is.null(taper_type)){
-      epsilon_n <- epsilon_tapering(n_total = cohort_size * max_cohorts, n_current = cohort_size * cohort_count, epsilon, taper_type = taper_type)
-      pipe_hat$setEpsilon(epsilon_n)
-    }
+    epsilon_n <- epsilon_tapering(n_total = cohort_size * max_cohorts, n_current = cohort_size * cohort_count, epsilon, taper_type = taper_type)
+    pipe_hat$setEpsilon(epsilon_n)
+    
     temp <- pipe_hat$updatePipeEstimator(p_posterior)
     
     # Store iteration results
@@ -46,16 +45,21 @@ runTrialSimulation <- function(starting_dose_level, cohort_size, max_cohorts, pr
     
     current_dose_level <- next_dose_level
   }
-  
+  summStats <- patientDataModel$getSummaryStats(includeAllCombi = TRUE)
+  p_posterior_mode <- 
+      drugCombinationModel$calculatePosterior(drugCombinationModel$theta + 0.1, summStats) - 
+      drugCombinationModel$calculatePosterior(drugCombinationModel$theta - 0.1, summStats)
   # Capture final patient data and RP2D
   final_patient_data <- patientDataModel$patientData
-  RP2D <- patientDataModel$getRP2D(pipe_hat$bestConfigs$currentConfig, drugcombi_new)
+  tried_doses <- sort(drugcombi_new$getDoseCombinationsLevel(final_patient_data %>% pull(doseCombination) %>% unlist() %>% unique()))
+  RP2D <- tried_doses[which.max(p_posterior_mode[tried_doses])]
   MTD <- patientDataModel$getMTD(pipe_hat$bestConfigs$currentConfig, drugcombi_new)
   
   return(list(
     simulation_results = simulation_results,
     final_patient_data = final_patient_data,
     RP2D = RP2D,
-    MTD = MTD
+    MTD = MTD,
+    p_posterior_mode = p_posterior_mode
   ))
 }

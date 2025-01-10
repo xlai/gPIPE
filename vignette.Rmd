@@ -209,8 +209,8 @@ Let us first define the dose levels for each drug under investigation in the tri
 This can be done either through reading information from a YAML file with specific dose levels, or initialised without.
 
 ```{r, echo = TRUE}
-num_doses_a <- 6
-num_doses_b <- 6
+num_doses_a <- 5
+num_doses_b <- 3
 drugA <- createDrug(name = 'drugA', doseCount = num_doses_a)
 drugB <- createDrug(name = 'drugB', doseCount = num_doses_b)
 drug_list <- list(drugA, drugB)
@@ -228,10 +228,10 @@ This means that we will set `isNonDecreasing = FALSE` for non-increasing configu
 #all_configs <- rep(list(0:1),  drugcombi_new$getNumberOfDoseLevels(combined = TRUE))  %>%
 #        expand.grid()
 #all_configs <-  lapply(seq_len(nrow(all_configs)), function(i) as.numeric(all_configs[i,]))
-all_configs <- monotonic.matrices(6,6)
+all_configs <- monotonic.matrices(5,3, "decreasing")
 all_configs <- lapply(all_configs, function(x)c(x))
 dose_configs_new <-lapply(all_configs,
-    function(x) createDoseConfig(drugCombiObject = drugcombi_new, isNonDecreasing = TRUE, currentConfig = as.numeric(x))
+    function(x) createDoseConfig(drugCombiObject = drugcombi_new, isNonDecreasing = FALSE, currentConfig = as.numeric(x))
 )
 dose_configs_valid <- purrr::keep(dose_configs_new, ~ any(.x$isValid ==TRUE))
 ```
@@ -259,8 +259,8 @@ admissible_rule_list <- list(
 
 )
 selection_rule_list <- list(
-    rule_equal_ss <- EqualRandomisationStrategy$new()
-#    rule_smallest_ss <- SmallestSampleSizeStrategy$new()
+#    rule_equal_ss <- EqualRandomisationStrategy$new()
+    rule_smallest_ss <- SmallestSampleSizeStrategy$new()
 #    rule_inv_sqrt_ss <- InverseSqrtSampleSizeStrategy$new()
 #    rule_posterior_ss <- PosteriorProbabilityStrategy$new()
 #    rule_inv_dist_ss <- InverseDistanceStrategy$new()            

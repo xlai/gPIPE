@@ -1,17 +1,27 @@
-library(doFuture)
 
 # Parameters for simulation
 num_simulations <- 100
 starting_dose_level <- "dose1.dose1"
-cohort_size <- 2
-max_cohorts <- 30
+cohort_size <- 1
+max_cohorts <- 60
+
+epsilon_range <- seq(0.05, 0.5, 0.05)
+
+epsilon_calibrated <- calibrate_epsilon(dose_configs_valid, 
+                              epsilon_range, 
+                              num_simulations, 
+                              starting_dose_level, 
+                              cohort_size, 
+                              max_cohorts, 
+                              drugCombinationModel, 
+                              drugcombi_new, 
+                              pipe_hat, 
+                              fdr_threshold = 0.05, 
+                              user_defined_scenario = NULL,
+                              return_fdr_tpr = TRUE)
 
 # Ensure the necessary objects and lists are defined or loaded here
 patientDataModel <- createPatientDataModel(drugcombi_new, admissible_rule_list, selection_rule_list)
-
-plan(multisession)
-
-options(future.globals.onReference = "warning")
 
 # Run simulations in parallel
 simulation_outputs <- foreach(
@@ -42,42 +52,6 @@ simulation_outputs <- foreach(
     })
 #  runTrialSimulation(starting_dose_level, cohort_size, max_cohorts, prob_true_list, drugCombinationModel, drugcombi_new, pipe_hat, admissible_rule_list, selection_rule_list)
 }
-
-run_simulation <- function(
-  dose_configs_valid, 
-  epsilon_final,
-  num_simulations, 
-  starting_dose_level, 
-  cohort_size, 
-  max_cohorts, 
-  drugCombinationModel, 
-  drugcombi_new, 
-  pipe_hat, 
-  taper_type = 'quadratic'
-  ) {
-      # Initialize a list to store simulation results
-  simulation_results <- list()
-
-  for (i in 1:num_simulations) {
-    patientDataModel <- createPatientDataModel(drugcombi_new, admissible_rule_list, selection_rule_list)
-    simulation_results[[i]] <- tryCatch({
-      runTrialSimulation(starting_dose_level, cohort_size, max_cohorts, 
-                        prob_true_list, drugCombinationModel, drugcombi_new, 
-                        pipe_hat, patientDataModel, epsilon = epsilon_final, taper_type = taper_type)
-    }, error = function(e) {
-      if (grepl("No admissible doses found", e$message)) {
-        cat(sprintf("Simulation %d stopped early: %s\n", i, e$message))
-        return(NULL)
-      } else {
-        stop(e)
-      }
-    })
-  }
-  return(simulation_results)
-}
-        
-# Assuming your sim_output list is already loaded
-final_patient_data <- sim_output$final_patient_data
 
 calculate_cumulative_dlt <- function(data, drugA, drugB, cohort_limit, expand_grid = FALSE) {
   # Filter data up to the specified cohort
@@ -121,7 +95,7 @@ prepare_step_data <- function(sim_output, drugA, drugB, cohort_limit) {
   nlevel_drugB <- length(drugB$doses)
 
   xlevel <- 1:(nlevel_drugA + 1) - 0.5
-  ylevel <- c(apply(matrix(pipe_estimate, ncol = nlevel_drugA),2,function(i){min(which(i==1),nlevel_drugB + 1)-0.5}), 0.5)
+  ylevel <- c(apply(matrix(pipe_estimate, ncol = nlevel_drugA),2,function(i){min(which(i==0),nlevel_drugB + 1)-0.5}), 0.5)
 
   # Prepare the step data
   step_data <- data.frame(
@@ -161,40 +135,6 @@ plot_dlt_proportion <- function(sim_output, drugA, drugB, cohort_seq) {
   
   return(p)
 }
-
-
-# For animation, create a list of plots for each cohort sequence
-cohort_seqs <- 1:max_cohorts # Example sequence
-plots <- lapply(cohort_seqs, function(cohort_seq) {
-  plot_dlt_proportion(z1[[12]], drugA, drugB, cohort_seq)
-})
-# Extract the legend from one of the plots
-legend <- cowplot::get_legend(plots[[1]] + theme(legend.position = "bottom"))
-
-# Remove legends from all plots
-plots <- lapply(plots, function(plot) plot + theme(legend.position = "none" ))
-
-# Combine plots into a single page using cowplot
-combined_plot <- cowplot::plot_grid(plotlist = plots, ncol = 4, align = 'v')
-
-# Add a common title
-title <- cowplot::ggdraw() + cowplot::draw_label("Cumulative DLT Proportion by Dose Combination", fontface = 'bold')
-
-# Combine title, legend, and plots
-final_plot <- cowplot::plot_grid(title, combined_plot, legend, ncol = 1, rel_heights = c(0.1, 1, 0.1))
-
-ggsave(final_plot, file = '~/Downloads/pipe_plot_eps_0.3.pdf', height = 40, width = 30)
-
-
-# Combine the plots into an animation
-anim <- plots[[1]] + 
-  transition_states(cohort_seqs, transition_length = 2, state_length = 1) +
-  enter_fade() + exit_fade()
-
-# Save the animation
-anim_save("dlt_proportion_animation.gif", anim)
-
-
 
 # Function to create intervals around the target DLT probability
 create_intervals <- function(target_DLT_prob, interval_width) {
@@ -243,11 +183,57 @@ create_summary_table <- function(prob_true_list, target_DLT_prob, indifference_i
     patientData <- patientData %>%
       mutate(Interval = ifelse(DLT_prob >= lower_bound & DLT_prob <= upper_bound, "Yes", "No"))
   } else {
-    stop("Invalid mode selected. Choose either 'interval' or 'MTD'.")
+      stop("Invalid mode selected. Choose either 'interval' or 'MTD'.")
   }
   
   return(patientData)
 }
+
+# Function to check if the MTD identified falls within the intervals
+check_MTD_in_interval <- function(results, prob_true_list, drugcombi_new, target_DLT_prob, interval_width, quiet = TRUE) {
+  
+  # Retrieve the numeric index of the MTD from the results
+  MTD_index <- results$RP2D
+  
+  # If MTD_index is NA, return NA
+  if (is.na(MTD_index)) {
+    if (!quiet) {
+      message("MTD index is NA.")
+    }
+    return(NA)
+  }
+  
+  # Convert the numeric index into dose label
+  MTD_dose_label <- names(drugcombi_new$getDoseCombinationsLevel(MTD_index))
+  
+  # Extract the true probability of DLT for the identified MTD
+  MTD_true_prob <- prob_true_list[[MTD_dose_label]]
+  
+  # Create intervals around the target DLT probability
+  intervals <- create_intervals(target_DLT_prob, interval_width)
+  
+  # Check if the true probability of the MTD falls within the intervals
+  within_interval <- MTD_true_prob >= intervals[3] && MTD_true_prob <= intervals[4]
+  
+  # If not quiet, print the message
+  if (!quiet) {
+    if (within_interval) {
+      message(paste("The MTD falls within the acceptable interval:", intervals[3], "-", intervals[4]))
+    } else {
+      message(paste("The MTD does not fall within the acceptable interval:", intervals[3], "-", intervals[4]))
+    }
+  }
+  
+  # Return TRUE or FALSE
+  return(within_interval)
+}
+
+# Example usage:
+# check_MTD_in_interval(results, prob_true_list, drugcombi_new, 0.3, 0.1)
+
+
+# Example usage:
+# check_MTD_in_interval(results, prob_true_list, drugcombi_new, 0.3, 0.1)
 
 average_summary_across_simulations <- function(simulation_results, prob_true_list, target_DLT_prob, indifference_interval, mode = 'MTD') {
   # Initialize a list to store summary results for each simulation
@@ -267,7 +253,7 @@ average_summary_across_simulations <- function(simulation_results, prob_true_lis
   # Combine all summaries into a single dataframe
   combined_summary <- bind_rows(summary_list, .id = "Simulation") %>%
     group_by(Interval) %>%
-    summarise(Average_Number_of_Patients = mean(Number_of_Patients), Average_Number_of_DLTs = mean(Number_of_DLTs)) %>%
+    summarise(Average_Number_of_Patients = mean(Number_of_Patients)*length(Number_of_Patients)/length(simulation_results), Average_Number_of_DLTs = mean(Number_of_DLTs)*length(Number_of_Patients)/length(simulation_results)) %>%
     ungroup()
 
   # Return the combined summary
@@ -275,4 +261,67 @@ average_summary_across_simulations <- function(simulation_results, prob_true_lis
 }
 
 
+# Function to calculate percentage of each index being identified as MTD
+tabulate_MTD <- function(simulation_results, nrow, ncol) {
+  
+  # Create a vector to store counts of MTD identification for each index
+  total_indices <- nrow * ncol
+  counts <- rep(0, total_indices)
+  
+  # Length of the simulation list (denominator for percentages)
+  total_simulations <- length(simulation_results)
+  
+  # Loop through each simulation result
+  for (sim in simulation_results) {
+    # Get the RP2D index from the simulation result (it can be NA)
+    rp2d <- sim$RP2D
+    
+    # Only count valid RP2D (ignore NA values)
+    if (!is.na(rp2d) && rp2d >= 1 && rp2d <= total_indices) {
+      counts[rp2d] <- counts[rp2d] + 1
+    }
+  }
+  
+  # Convert counts to percentages
+  percentages <- (counts / total_simulations) * 100
+  
+  # Reshape the percentages into a matrix with the given dimensions
+  result_matrix <- matrix(percentages, ncol = ncol, byrow = FALSE)
+  return(result_matrix)
+}
+
 average_summary <- average_summary_across_simulations(simulation_results, prob_true_list, 0.3, 0.1)
+
+
+
+# For animation, create a list of plots for each cohort sequence
+cohort_seqs <- 1:max_cohorts # Example sequence
+plots <- lapply(cohort_seqs, function(cohort_seq) {
+  plot_dlt_proportion(results_eps0.5[[1]][[1]], drugA, drugB, cohort_seq)
+})
+# Extract the legend f# Example of running the simulations with 100 simulations per scenario
+legend <- cowplot::get_legend(plots[[1]] + theme(legend.position = "bottom"))
+
+# Remove legends from all plots
+plots <- lapply(plots, function(plot) plot + theme(legend.position = "none" ))
+
+# Combine plots into a single page using cowplot
+combined_plot <- cowplot::plot_grid(plotlist = plots, ncol = 4, align = 'v')
+
+# Add a common title
+title <- cowplot::ggdraw() + cowplot::draw_label("Cumulative DLT Proportion by Dose Combination", fontface = 'bold')
+
+# Combine title, legend, and plots
+final_plot <- cowplot::plot_grid(title, combined_plot, legend, ncol = 1, rel_heights = c(0.1, 1, 0.1))
+
+ggsave(final_plot, file = '~/Downloads/pipe_plot_eps_0.3.pdf', height = 40, width = 30)
+
+
+# Combine the plots into an animation
+anim <- plots[[1]] + 
+  transition_states(cohort_seqs, transition_length = 2, state_length = 1) +
+  enter_fade() + exit_fade()
+
+# Save the animation
+anim_save("dlt_proportion_animation.gif", anim)
+
