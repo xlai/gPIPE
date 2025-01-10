@@ -71,8 +71,8 @@ PipeEstimator <- setRefClass("PipeEstimator",
 
 
 logGain <- function(p_posterior, epsilon, weight, validConfiguration){
-    log_gain_vector <- weight*validConfiguration*(log(epsilon) + log(1 - p_posterior)) +
-        weight*(1 - validConfiguration)*(log(1 - epsilon) + log(p_posterior))
+    log_gain_vector <- weight*validConfiguration*(log(epsilon) + log(p_posterior)) +
+        weight*(1 - validConfiguration)*(log(1 - epsilon) + log(1 - p_posterior))
 
 return(sum(log_gain_vector))
 }

@@ -13,9 +13,9 @@ calculateNeighbourSum <- function(A, matrixDims) {
   mat <- matrix(A, nrow = nrows, ncol = ncols)
   
   # Create a padded matrix with extra row and column at the borders
-  padded_A <- matrix(0, nrow = nrows + 2, ncol = ncols + 2)
-  padded_A[nrows + 2,] <- 1
-  padded_A[,ncols + 2] <- 1
+  padded_A <- matrix(1, nrow = nrows + 2, ncol = ncols + 2)
+  padded_A[nrows + 2,] <- 0
+  padded_A[,ncols + 2] <- 0
 
   # Place the original matrix in the centre of the padded matrix
   padded_A[2:(nrows + 1), 2:(ncols + 1)] <- mat

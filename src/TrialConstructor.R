@@ -88,7 +88,7 @@ PatientDataModel <- setRefClass("PatientDataModel",
             neighbour_sum <- calculateNeighbourSum(doseConfig, n_dose_level)
             mtd_indices <- which(neighbour_sum == 2 & doseConfig == 1)
             if (length(mtd_indices) == 0){
-                cat('No MTD found.\n')
+#                cat('No MTD found.\n')
                 return(NA)
             }
             else{
@@ -99,7 +99,7 @@ PatientDataModel <- setRefClass("PatientDataModel",
             n_dose_level <- drugCombiModel$getNumberOfDoseLevels()
             # Calculate the neighbour sum using the provided function
             neighbour_sum <- calculateNeighbourSum(doseConfig, n_dose_level)
-            rp2d_indices <- which(neighbour_sum == 2 & doseConfig == 0)
+            rp2d_indices <- which(neighbour_sum == 2 & doseConfig == 1)
             if (length(rp2d_indices) == 0){
                 cat('No RP2D found.\n')
                 return(NA)
