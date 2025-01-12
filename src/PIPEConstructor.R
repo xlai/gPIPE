@@ -5,24 +5,34 @@ PipeEstimator <- setRefClass("PipeEstimator",
         bestConfigs = "DoseConfiguration", # one of the valid configurations
         validConfigs_posterior = "list", # posterior estimate for all valid configs
         epsilon = "numeric", # parameter indicating the mixing rate
-        weight = "numeric" # parameter set for each dose level
+        weight = "numeric", # parameter set for each dose level
+        taper_type = "character",
+        custom_taper = "ANY"  # Could be NULL or a function
     ),
     methods = list(
-        initialize = function(validConfigs = NULL, epsilon = 0.5) {
+        initialize = function(validConfigs = NULL, 
+                            epsilon = 0.5,
+                            taper_type = NULL, 
+                            custom_taper = NULL) {
             if (is.null(validConfigs)) {
-                # Handle the case where drugCombiObject is NULL
-                # This can be set to a default DrugDose object or keep it as NULL
-                # Example: drugDose <<- DrugDose$new() or drugDose <<- NULL
-#                drugCombi <<- NULL  # or any other default initialization
                 validConfigs <<- NULL
                 weight <<- NULL
             } else {
                 validConfigs <<- validConfigs
-                # Initialize the current configuration with NULL for each drug
             }
-            epsilon <<- epsilon
+            
+            # Store tapering parameters
+            taper_type <<- taper_type
+            custom_taper <<- custom_taper
             weight <<- 1
-        },    
+            
+            # Set initial epsilon
+            epsilon <<- epsilon  # Store target epsilon
+            if (!is.null(taper_type) || !is.null(custom_taper)) {
+                # If tapering is specified, initialize with n_current = 0
+                updateEpsilonWithTapering(n_total = 100, n_current = 0)
+            }
+        }, 
         updatePipeEstimator = function(p_posterior){
             log_gain_list <- lapply(
                 validConfigs, 
@@ -31,7 +41,7 @@ PipeEstimator <- setRefClass("PipeEstimator",
             validConfigs_posterior <<- log_gain_list
             bestConfigs <<- validConfigs[[which.max(log_gain_list)]]
 
-        return(log_gain_list)
+            return(log_gain_list)
         },
         updateWeight = function(weightNew){
             # write a function that update the weight according to patient numbers
@@ -39,6 +49,26 @@ PipeEstimator <- setRefClass("PipeEstimator",
         },        
         setEpsilon = function(epsilonNew){
             epsilon <<- epsilonNew
+        },
+        updateEpsilonWithTapering = function(n_total, n_current) {
+            if (is.null(taper_type) && is.null(custom_taper)) {
+                return(epsilon)
+            }
+            
+            if (!is.null(custom_taper)) {
+                epsilon <<- custom_taper(n_total, n_current, epsilon)
+            } else {
+                if (taper_type == "linear") {
+                    epsilon <<- (n_total - n_current) / (n_total + 1) * 0.5 + 
+                               (n_current + 1) / (n_total + 1) * epsilon
+                } else if (taper_type == "quadratic") {
+                    alpha <- n_current / n_total
+                    epsilon <<- (1 - alpha)^2 * 0.5 + alpha^2 * epsilon
+                } else {
+                    stop("Unsupported taper_type. Please use 'linear', 'quadratic', or provide a custom taper function.")
+                }
+            }
+            return(epsilon)
         },
         plot = function(p_posterior = NULL){
             acceptable_doses <- ifelse(bestConfigs$currentConfig == 0, 'Yes', 'No')
