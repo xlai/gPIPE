@@ -4,15 +4,37 @@ PatientDataModel <- setRefClass("PatientDataModel",
         patientData = "data.frame",  # Data frame to store patient level data        
         admissibleRule = "list",
         selectionStrategy = "list",
-        currentCohort = "numeric"
+        currentCohort = "numeric",
+        startingDoseLevel = "character",  # Starting dose level
+        cohortSize = "numeric",           # Number of patients per cohort
+        maxCohorts = "numeric",           # Maximum number of cohorts
+        maxSampleSize = "numeric"         # Derived from cohortSize * maxCohorts
     ),
     methods = list(
-        initialize = function(drugCombiObject, admissibleRuleList = list(), selectionStrategyList = list()) {
+        initialize = function(drugCombiObject, 
+                            admissibleRuleList = list(), 
+                            selectionStrategyList = list(),
+                            startingDoseLevel = NULL,
+                            cohortSize = 3,
+                            maxCohorts = 20) {
             drugCombi <<- drugCombiObject
-            patientData <<- data.frame(doseCombination = I(list()), outcome = numeric(), stringsAsFactors = FALSE)
+            patientData <<- data.frame(
+                doseCombination = I(list()),
+                outcome = numeric(),
+                stringsAsFactors = FALSE
+            )
             admissibleRule <<- admissibleRuleList
             selectionStrategy <<- selectionStrategyList
             currentCohort <<- 1
+            # Initialize trial design parameters
+            startingDoseLevel <<- startingDoseLevel %||% names(drugCombi$getDoseCombinationsLevel())[1]
+            cohortSize <<- cohortSize
+            maxCohorts <<- maxCohorts
+            maxSampleSize <<- cohortSize * maxCohorts
+            # Validate starting dose level
+            if (!isDoseCombinationValid(startingDoseLevel)) {
+                stop("Invalid starting dose level.")
+            }
         },
         addPatientData = function(doseCombination, outcome, cohort) {
             # Validate doseCombination
@@ -112,8 +134,21 @@ PatientDataModel <- setRefClass("PatientDataModel",
 )
 
 # Function to create a new PatientDataModel object
-createPatientDataModel <- function(drugDoseObject, admissibleRuleList=list(), selectionStrategyList=list()) {
-    return(PatientDataModel$new(drugDoseObject, admissibleRuleList, selectionStrategyList))
+createPatientDataModel <- function(drugDoseObject, 
+                                 admissibleRuleList = list(),
+                                 selectionStrategyList = list(),
+                                 startingDoseLevel = NULL,
+                                 cohortSize = 3,
+                                 maxCohorts = 20) {
+    
+    return(PatientDataModel$new(
+        drugCombiObject = drugDoseObject,
+        admissibleRuleList = admissibleRuleList,
+        selectionStrategyList = selectionStrategyList,
+        startingDoseLevel = startingDoseLevel,
+        cohortSize = cohortSize,
+        maxCohorts = maxCohorts
+    ))
 }
 
 find_closest_to_boundary <- function(vectorized_matrix, nrow, ncol) {
