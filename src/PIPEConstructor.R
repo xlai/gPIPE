@@ -5,14 +5,15 @@ PipeEstimator <- setRefClass("PipeEstimator",
         bestConfigs = "DoseConfiguration", # one of the valid configurations
         validConfigs_posterior = "list", # posterior estimate for all valid configs
         epsilon = "numeric", # parameter indicating the mixing rate
+        epsilonTarget = "numeric", #target epsilon value after tapering
         weight = "numeric", # parameter set for each dose level
         taper_type = "character",
         custom_taper = "ANY"  # Could be NULL or a function
     ),
     methods = list(
-        initialize = function(validConfigs = NULL, 
-                            epsilon = 0.5,
-                            taper_type = NULL, 
+        initialize = function(validConfigs = NULL,
+                            epsilonTarget = 0.5,
+                            taper_type = NULL,
                             custom_taper = NULL) {
             if (is.null(validConfigs)) {
                 validConfigs <<- NULL
@@ -27,7 +28,8 @@ PipeEstimator <- setRefClass("PipeEstimator",
             weight <<- 1
             
             # Set initial epsilon
-            epsilon <<- epsilon  # Store target epsilon
+            epsilonTarget <<- epsilonTarget # Store target epsilon
+            epsilon <<- epsilonTarget
             if (!is.null(taper_type) || !is.null(custom_taper)) {
                 # If tapering is specified, initialize with n_current = 0
                 updateEpsilonWithTapering(n_total = 100, n_current = 0)
@@ -50,20 +52,23 @@ PipeEstimator <- setRefClass("PipeEstimator",
         setEpsilon = function(epsilonNew){
             epsilon <<- epsilonNew
         },
+        setEpsilonTarget = function(epsilonNew){
+            epsilonTarget <<- epsilonNew
+        },        
         updateEpsilonWithTapering = function(n_total, n_current) {
             if (is.null(taper_type) && is.null(custom_taper)) {
                 return(epsilon)
             }
             
             if (!is.null(custom_taper)) {
-                epsilon <<- custom_taper(n_total, n_current, epsilon)
+                epsilon <<- custom_taper(n_total, n_current, epsilonTarget)
             } else {
                 if (taper_type == "linear") {
                     epsilon <<- (n_total - n_current) / (n_total + 1) * 0.5 + 
-                               (n_current + 1) / (n_total + 1) * epsilon
+                               (n_current + 1) / (n_total + 1) * epsilonTarget
                 } else if (taper_type == "quadratic") {
                     alpha <- n_current / n_total
-                    epsilon <<- (1 - alpha)^2 * 0.5 + alpha^2 * epsilon
+                    epsilon <<- (1 - alpha)^2 * 0.5 + alpha^2 * epsilonTarget
                 } else {
                     stop("Unsupported taper_type. Please use 'linear', 'quadratic', or provide a custom taper function.")
                 }

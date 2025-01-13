@@ -5,6 +5,7 @@ PatientDataModel <- setRefClass("PatientDataModel",
         admissibleRule = "list",
         selectionStrategy = "list",
         currentCohort = "numeric",
+        currentDoseLevel = "character",
         startingDoseLevel = "character",  # Starting dose level
         cohortSize = "numeric",           # Number of patients per cohort
         maxCohorts = "numeric",           # Maximum number of cohorts
@@ -45,6 +46,16 @@ PatientDataModel <- setRefClass("PatientDataModel",
             # Adds patient data to the model
             patientData <<- rbind(patientData, data.frame(doseCombination = I(list(doseCombination)), outcome = outcome, cohort))
         },
+        resetTrial = function() {
+            patientData <<- data.frame(
+                doseCombination = I(list()),
+                outcome = numeric(),
+                cohort = numeric(),
+                stringsAsFactors = FALSE
+            )
+            currentCohort <<- 1
+            currentDoseLevel <<- startingDoseLevel
+        },
         isDoseCombinationValid = function(doseCombination) {
             # Check if each dose is valid for its corresponding drug
             if (!(doseCombination %in% names(drugCombi$doseCombinations))) {
@@ -52,6 +63,15 @@ PatientDataModel <- setRefClass("PatientDataModel",
             }
             return(TRUE)
         },
+        setCurrentDoseLevel = function(doseLevel) {
+            # First, validate the dose level
+            if (!isDoseCombinationValid(doseLevel)) {
+                stop("Invalid dose combination.")
+            }
+            
+            # Update the current dose level
+            currentDoseLevel <<- doseLevel
+        },        
         getSummaryStats = function(includeAllCombi = TRUE) {
             # Computes summary statistics for each dose level combination
             summaryStats <- tapply(patientData$outcome, sapply(patientData$doseCombination, toString), function(x) {
@@ -65,18 +85,31 @@ PatientDataModel <- setRefClass("PatientDataModel",
             } 
             return(summaryStats)
         },
-        generateRandomPatientData = function(doseLevel, numPatients, outcomeProb = 0.5) {
-            # doseLevels: A dose labels for the drug combination
-            # numPatients: Number of random patients to generate
-            # outcomeProb: Probability of adverse event (default 0.5)
-            for (i in 1:numPatients) {
-                if (.self$isDoseCombinationValid(doseLevel)){
-                    # generate probabilistic outcome
-                    outcome <- rbinom(1, 1, outcomeProb)
-                    # Add generated patient data
-                    addPatientData(doseCombination = doseLevel, outcome = outcome, cohort = currentCohort)
-                }
+        generateRandomPatientData = function(outcomeProb, doseLevel = NULL, numPatients = NULL) {
+            # If only outcomeProb provided, use object state
+            if (is.null(doseLevel) && is.null(numPatients)) {
+                doseLevel <- currentDoseLevel
+                numPatients <- cohortSize
             }
+            # Validate dose level
+            if (!isDoseCombinationValid(doseLevel)) {
+                stop("Invalid dose combination.")
+            }
+            # Store current state if using custom dose
+            if (doseLevel != currentDoseLevel) {
+                previousDose <- currentDoseLevel
+                currentDoseLevel <<- doseLevel
+            }
+            # Generate data
+            for (i in 1:numPatients) {
+                outcome <- rbinom(1, 1, outcomeProb)
+                addPatientData(
+                    doseCombination = doseLevel,
+                    outcome = outcome,
+                    cohort = currentCohort
+                )
+            }
+            # Update cohort
             currentCohort <<- currentCohort + 1
         },
         getNextDoseLevel = function(currentLevel, valid_dose_config, drugCombiModel) {
@@ -103,6 +136,18 @@ PatientDataModel <- setRefClass("PatientDataModel",
                 warning("No admissible doses found based on the current rules.")
             }
             return(nextDose)
+        },
+        isStoppingCriteriaMet = function() {
+            # For now, just check if we've exceeded maximum cohorts
+            # Returns TRUE if trial should stop
+            return(currentCohort > maxCohorts)
+        },
+        # Can also add a method to get stopping reason if needed
+        getStoppingReason = function() {
+            if (isStoppingCriteriaMet()) {
+                return("Maximum number of cohorts reached")
+            }
+            return(NA)  # No stopping reason if criteria not met
         },
         getMTD = function(doseConfig, drugCombiModel){
             n_dose_level <- drugCombiModel$getNumberOfDoseLevels()

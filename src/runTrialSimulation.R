@@ -1,40 +1,31 @@
-runTrialSimulation <- function(starting_dose_level, cohort_size, max_cohorts, prob_true_list, drugCombinationModel, drugcombi_new, pipe_hat, patientDataModel, epsilon = 0.05, taper_type = 'quadratic') {
-  # Initialise variables
-  current_dose_level <- starting_dose_level
+runTrialSimulation <- function(prob_true_list, drugCombinationModel, drugcombi_new, pipe_hat, patientDataModel, seed = NULL) {
+  
+  if (!is.null(seed)) set.seed(seed)
+
   simulation_results <- list()
-  cohort_count <- 0  # Initialize cohort count
+  patientDataModel$resetTrial()
   
-  # Create patient data model
-  # patientDataModel <- createPatientDataModel(drugcombi_new, admissible_rule_list, selection_rule_list)
-  
-  repeat {
+  while (!patientDataModel$isStoppingCriteriaMet()) {
     # Generate patient data for the current cohort at the current dose level
-    outcome_prob <- as.numeric(prob_true_list[current_dose_level])
-    patientDataModel$generateRandomPatientData(current_dose_level, cohort_size, outcomeProb = outcome_prob)
+    outcome_prob <- as.numeric(prob_true_list[patientDataModel$currentDoseLevel])
+    patientDataModel$generateRandomPatientData(outcome_prob)
     
     # Update the model based on the new patient data
     p_posterior <- drugCombinationModel$updateModel(patientDataModel)
     
     # Update PIPE estimator
-    epsilon_n <- epsilon_tapering(n_total = cohort_size * max_cohorts, n_current = cohort_size * cohort_count, epsilon, taper_type = taper_type)
-    pipe_hat$setEpsilon(epsilon_n)
-    
+    pipe_hat$updateEpsilonWithTapering(
+      n_total = patientDataModel$maxCohorts,
+      n_current = patientDataModel$currentCohort - 1
+    )
     temp <- pipe_hat$updatePipeEstimator(p_posterior)
     
     # Store iteration results
-    simulation_results[[length(simulation_results) + 1]] <- list(
-      dose_level = current_dose_level,
-      p_posterior = p_posterior,
-      best_config = pipe_hat$bestConfigs$currentConfig
+    simulation_results[[patientDataModel$currentCohort]] <- list(
+        dose_level = patientDataModel$currentDoseLevel,
+        p_posterior = p_posterior,
+        best_config = pipe_hat$bestConfigs$currentConfig
     )
-    
-    # Increment cohort count
-    cohort_count <- cohort_count + 1
-    
-    # Check for next dose level or if maximum number of cohorts reached
-    if (cohort_count >= max_cohorts) {
-      break # Break if maximum number of cohorts have been recruited
-    }
     
     current_dose_level_numeric <- drugcombi_new$getDoseCombinationsLevel(current_dose_level)
     next_dose_level_numeric <- patientDataModel$getNextDoseLevel(current_dose_level_numeric, pipe_hat, drugCombinationModel)
@@ -42,8 +33,7 @@ runTrialSimulation <- function(starting_dose_level, cohort_size, max_cohorts, pr
       break # Break if no doses found to continue the trial
     }
     next_dose_level <- names(drugcombi_new$getDoseCombinationsLevel(next_dose_level_numeric))
-    
-    current_dose_level <- next_dose_level
+    patientDataModel$setCurrentDoseLevel(next_dose_level)
   }
   summStats <- patientDataModel$getSummaryStats(includeAllCombi = TRUE)
   p_posterior_mode <- 
