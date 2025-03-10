@@ -1,2 +1,4 @@
 ^\.github$
 ^codecov\.yml$
+^gPIPE\.Rproj$
+^\.Rproj\.user$

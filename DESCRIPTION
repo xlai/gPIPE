@@ -1,14 +1,25 @@
 Package: gPIPE
-Title: An Integrated R Package for Dose Escalation Studies Using the PIPE Method
+Title: Generalized PIPE Design with Epsilon-Tapering for Dose-Finding Studies
 Version: 0.0.0.9000
 Authors@R: 
     person("Xiaoran", "Lai", , "research@xlai.org", role = c("aut", "cre"),
-           comment = c(ORCID = "YOUR-ORCID-ID"))
-Description: A bayesian method for dose escalation studies.
+           comment = c(ORCID = "0000-0002-7364-3993"))
+Description: Implements a generalized Product of Independent Beta Probabilities Escalation (PIPE) 
+    design incorporating epsilon-tapering for dual-agent dose-finding studies. Building on Cheung et al.'s (2022) asymmetric posterior gain and 
+    epsilon-tapering framework, gPIPE improves dose-space exploration while effectively 
+    controlling false discovery rates. The implementation features flexible admissibility rules, 
+    multiple dose selection strategies, and robust simulation tools for design calibration, 
+    evaluation, and comparison with existing dose-finding methodologies.
 License: GPL (>= 3)
+Imports: 
+    yaml,
+    dplyr,
+    ggplot2
 Suggests: 
     testthat (>= 3.0.0)
+    bookdown,
+    knitr    
 Config/testthat/edition: 3
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.2.3
+RoxygenNote: 7.3.2
