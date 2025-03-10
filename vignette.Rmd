@@ -7,9 +7,10 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 path_to_source <- "./src/"
+source(paste(path_to_source, 'DrugCombiConstructor.R', sep=''))
 files_to_source <- list.files(path = path_to_source, pattern = '*.R')
 sapply(files_to_source, function(x) source(paste0(path_to_source, x )))
-source('src/utils/calculate_neighbour_sum.R')
+source(paste(path_to_source, '/utils/calculate_neighbour_sum.R', sep=''))
 ```
 
 # Introduction
@@ -90,7 +91,7 @@ uniquely defined for drug combinations
 
 Assume we have a list of drug created using `Drug` class, the a `DrugCombi` object can be initialised as the following
 ```{r, echo = TRUE}
-drugcombi_new <- DrugCombi$new(drugs =drug_list) 
+drugcombi_new <- DrugCombi$new(drugs = drug_list)
 ```
 
 ## Dose Configuration Class
@@ -224,12 +225,9 @@ We will then set up the PIPE configurations and find the set of configurations t
 Note that we would like our dose configuration to be equal to 1 if it the dose level is acceptable, and 0 otherwise.
 This means that we will set `isNonDecreasing = FALSE` for non-increasing configurations.
 ```{r new, echo = FALSE, cache=FALSE}
-#all_configs <- rep(list(0:1),  drugcombi_new$getNumberOfDoseLevels(combined = TRUE))  %>%
-#        expand.grid()
-#all_configs <-  lapply(seq_len(nrow(all_configs)), function(i) as.numeric(all_configs[i,]))
-all_configs <- monotonic.matrices(5,3, "decreasing")
-all_configs <- lapply(all_configs, function(x)c(x))
-dose_configs_new <-lapply(all_configs,
+all_configs <- monotonic_matrices(num_doses_a, num_doses_b, "decreasing")
+all_configs <- lapply(all_configs, function(x) c(x))
+dose_configs_new <- lapply(all_configs,
     function(x) createDoseConfig(drugCombiObject = drugcombi_new, isNonDecreasing = FALSE, currentConfig = as.numeric(x))
 )
 dose_configs_valid <- purrr::keep(dose_configs_new, ~ any(.x$isValid ==TRUE))
@@ -279,7 +277,7 @@ prob_true_list <- setNames(as.list(prob_true$probability), prob_true$dose_level)
 ### Patient dose level assignment
 ```{r, echo = TRUE}
 current_dose_level <- "dose1.dose1"
-cohort_size <- 3
+cohort_size <- 2
 max_cohorts <- 20
 ```
 
@@ -315,4 +313,7 @@ next_dose_level_numeric <- patientDataModel$getNextDoseLevel(current_dose_level_
 next_dose_level <- names(drugcombi_new$getDoseCombinationsLevel(next_dose_level_numeric))
 ```
 
-runTrialSimulation('dose1.dose1', 2, 20, prob_true_list, drugCombinationModel, drugcombi_new, pipe_hat, admissible_rule_list, selection_rule_list)
+## Trial Simulation
+```{r}
+runTrialSimulation('dose1.dose1', cohort_size, cohort_size, prob_true_list, drugCombinationModel, drugcombi_new, pipe_hat, admissible_rule_list, selection_rule_list)
+```
