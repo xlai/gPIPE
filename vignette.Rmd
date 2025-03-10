@@ -317,3 +317,20 @@ next_dose_level <- names(drugcombi_new$getDoseCombinationsLevel(next_dose_level_
 ```{r}
 runTrialSimulation('dose1.dose1', cohort_size, cohort_size, prob_true_list, drugCombinationModel, drugcombi_new, pipe_hat, admissible_rule_list, selection_rule_list)
 ```
+
+# Epsilon Calibration
+In this section, we will demonstrate how to calibrate epsilon for the PIPE design.
+```{r}
+epsilon_range <- seq(0.05, 0.5, 0.05)
+num_simulations <- 100
+patientDataModel <- createPatientDataModel(drugcombi_new, admissible_rule_list, selection_rule_list, startingDoseLevel = current_dose_level, cohortSize = cohort_size, maxCohorts = max_cohorts)
+epsilon_calibrated <- calibrate_epsilon(dose_configs_valid,
+                              epsilon_range,
+                              num_simulations,
+                              drugCombinationModel,
+                              drugcombi_new,
+                              patientDataModel)
+
+# Display the calibrated epsilon
+epsilon_calibrated
+```
