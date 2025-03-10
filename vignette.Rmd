@@ -9,7 +9,6 @@ knitr::opts_chunk$set(echo = TRUE)
 path_to_source <- "./src/"
 files_to_source <- list.files(path = path_to_source, pattern = '*.R')
 sapply(files_to_source, function(x) source(paste0(path_to_source, x )))
-source('src/utils/epsilon_tapering.R')
 source('src/utils/calculate_neighbour_sum.R')
 ```
 
@@ -26,7 +25,7 @@ if (!requireNamespace("yaml", quietly = TRUE)) {
     install.packages("yaml")
 }
 library(yaml)
-library(kableExtra) # For knitting dataframes
+#library(kableExtra) # For knitting dataframes
 library(dplyr)
 library(ggplot2)
 ```
@@ -238,7 +237,7 @@ dose_configs_valid <- purrr::keep(dose_configs_new, ~ any(.x$isValid ==TRUE))
 The PIPE estimator is initialised with $weight = 1$ and $\epsilon = 0.5$.
 
 ```{r, echo = TRUE}
-pipe_hat <- PipeEstimator(dose_configs_valid, epsilon = 0.5)
+pipe_hat <- PipeEstimator(dose_configs_valid, epsilonTarget = 0.5, taper_type = 'linear')
 ```
 
 The rules for determining admissible and safety rules also need to be established:
@@ -262,7 +261,7 @@ selection_rule_list <- list(
 #    rule_equal_ss <- EqualRandomisationStrategy$new()
     rule_smallest_ss <- SmallestSampleSizeStrategy$new()
 #    rule_inv_sqrt_ss <- InverseSqrtSampleSizeStrategy$new()
-#    rule_posterior_ss <- PosteriorProbabilityStrategy$new()
+#   rule_posterior_ss <- PosteriorProbabilityStrategy$new()
 #    rule_inv_dist_ss <- InverseDistanceStrategy$new()            
 )
 ```
@@ -276,16 +275,18 @@ prob_true <- read.csv('tests/dose_levels_probability_riviere.csv')
 prob_true_list <- setNames(as.list(prob_true$probability), prob_true$dose_level)
 ```
 
-```{r, echo = TRUE}
-patientDataModel <- createPatientDataModel(drugcombi_new, admissible_rule_list, selection_rule_list)
-```
-
 ## Trial Conduct
 ### Patient dose level assignment
 ```{r, echo = TRUE}
 current_dose_level <- "dose1.dose1"
-cohort_size <- 2
+cohort_size <- 3
+max_cohorts <- 20
 ```
+
+```{r, echo = TRUE}
+patientDataModel <- createPatientDataModel(drugcombi_new, admissible_rule_list, selection_rule_list, startingDoseLevel = current_dose_level, cohortSize = cohort_size, maxCohorts = max_cohorts)
+```
+
 
 We will start the trial by enrolling patients in cohorts of `r cohort_size` onto a dose level, initially set as the lowest dose level `r current_dose_level`. 
 ```{r, echo = TRUE}

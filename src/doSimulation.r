@@ -10,48 +10,11 @@ epsilon_range <- seq(0.05, 0.5, 0.05)
 epsilon_calibrated <- calibrate_epsilon(dose_configs_valid, 
                               epsilon_range, 
                               num_simulations, 
-                              starting_dose_level, 
-                              cohort_size, 
-                              max_cohorts, 
                               drugCombinationModel, 
                               drugcombi_new, 
-                              pipe_hat, 
-                              fdr_threshold = 0.05, 
-                              user_defined_scenario = NULL,
-                              return_fdr_tpr = TRUE)
+                              patientDataModel)
 
-# Ensure the necessary objects and lists are defined or loaded here
-patientDataModel <- createPatientDataModel(drugcombi_new, admissible_rule_list, selection_rule_list)
 
-# Run simulations in parallel
-simulation_outputs <- foreach(
-  i = 1:num_simulations, 
-  .combine = 'list', .options.future = list(seed = TRUE, noexport=c('patientDataModel','drugCombinationModel', 'drugcombi_new'))
-  ) %dofuture% {
-    source('src/DrugCombiConstructor.R')
-    source('src/TrialConstructor.R')
-    source('src/DoseModelConstructor.R')
-    drugcombi_new <- DrugCombi$new(drugs=drug_list)     
-    drugCombinationModel <- createDrugCombinationModel("./src/drugPrior_6level.yaml")
-    patientDataModel <- createPatientDataModel(drugcombi_new, admissible_rule_list, selection_rule_list)
-    pipe_hat <- PipeEstimator(dose_configs_valid, epsilon = 0.1)
-
-    tryCatch({
-      # Call your function with the desired parameters
-      runTrialSimulation(starting_dose_level, cohort_size, max_cohorts, 
-                        prob_true_list, drugCombinationModel, drugcombi_new, 
-                        pipe_hat, patientDataModel)
-    }, error = function(e) {
-      # Handle the case where no admissible dose is found
-      if (grepl("No admissible doses found", e$message)) {
-        cat(sprintf("Simulation %d stopped early: %s\n", i, e$message))
-        return(NULL)  # Return NULL or any other indicator of early stop
-      } else {
-        stop(e)  # Re-throw other errors that are not handled
-      }
-    })
-#  runTrialSimulation(starting_dose_level, cohort_size, max_cohorts, prob_true_list, drugCombinationModel, drugcombi_new, pipe_hat, admissible_rule_list, selection_rule_list)
-}
 
 calculate_cumulative_dlt <- function(data, drugA, drugB, cohort_limit, expand_grid = FALSE) {
   # Filter data up to the specified cohort
@@ -262,32 +225,56 @@ average_summary_across_simulations <- function(simulation_results, prob_true_lis
 
 
 # Function to calculate percentage of each index being identified as MTD
-tabulate_MTD <- function(simulation_results, nrow, ncol) {
-  
-  # Create a vector to store counts of MTD identification for each index
-  total_indices <- nrow * ncol
-  counts <- rep(0, total_indices)
-  
-  # Length of the simulation list (denominator for percentages)
-  total_simulations <- length(simulation_results)
-  
-  # Loop through each simulation result
-  for (sim in simulation_results) {
-    # Get the RP2D index from the simulation result (it can be NA)
-    rp2d <- sim$RP2D
+tabulate_MTD <- function(simulation_results, nrow, ncol, type = "RP2D") {
+    # Create a vector to store counts
+    total_indices <- nrow * ncol
+    counts <- rep(0, total_indices)
     
-    # Only count valid RP2D (ignore NA values)
-    if (!is.na(rp2d) && rp2d >= 1 && rp2d <= total_indices) {
-      counts[rp2d] <- counts[rp2d] + 1
+    # Length of the simulation list (denominator for percentages)
+    total_simulations <- length(simulation_results)
+    
+    if (type == "RP2D") {
+        # Original RP2D counting logic
+        for (sim in simulation_results) {
+            rp2d <- sim$RP2D
+            if (!is.na(rp2d) && rp2d >= 1 && rp2d <= total_indices) {
+                counts[rp2d] <- counts[rp2d] + 1
+            }
+        }
+        
+        # Simple percentage for RP2D
+        percentages <- (counts / total_simulations) * 100
+        
+    } else if (type == "MTD") {
+        # MTD counting logic - handling multiple MTDs
+        for (sim in simulation_results) {
+            mtds <- sim$MTD
+            
+            if (!is.null(mtds) && length(mtds) > 0) {
+                # Remove any NA or out of bounds values
+                valid_mtds <- mtds[!is.na(mtds) & mtds >= 1 & mtds <= total_indices]
+                
+                if (length(valid_mtds) > 0) {
+                    # Option 1: Simple percentage (counting each appearance)
+                    counts[valid_mtds] <- counts[valid_mtds] + 1
+                    
+                    # Option 2: Weighted percentage (uncommment to use)
+#                     weight <- 1/length(valid_mtds)
+#                     counts[valid_mtds] <- counts[valid_mtds] + weight
+                }
+            }
+        }
+        
+        # Calculate percentages based on total simulations
+        percentages <- (counts / total_simulations) * 100
+    } else {
+        stop("Invalid type. Use 'RP2D' or 'MTD'")
     }
-  }
-  
-  # Convert counts to percentages
-  percentages <- (counts / total_simulations) * 100
-  
-  # Reshape the percentages into a matrix with the given dimensions
-  result_matrix <- matrix(percentages, ncol = ncol, byrow = FALSE)
-  return(result_matrix)
+    
+    # Reshape into matrix
+    result_matrix <- matrix(percentages, ncol = ncol, byrow = FALSE)
+    
+    return(result_matrix)
 }
 
 average_summary <- average_summary_across_simulations(simulation_results, prob_true_list, 0.3, 0.1)
@@ -297,7 +284,7 @@ average_summary <- average_summary_across_simulations(simulation_results, prob_t
 # For animation, create a list of plots for each cohort sequence
 cohort_seqs <- 1:max_cohorts # Example sequence
 plots <- lapply(cohort_seqs, function(cohort_seq) {
-  plot_dlt_proportion(results_eps0.5[[1]][[1]], drugA, drugB, cohort_seq)
+  plot_dlt_proportion(results_eps0.6[[1]][[1]], drugA, drugB, cohort_seq)
 })
 # Extract the legend f# Example of running the simulations with 100 simulations per scenario
 legend <- cowplot::get_legend(plots[[1]] + theme(legend.position = "bottom"))

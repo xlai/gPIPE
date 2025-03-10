@@ -16,12 +16,12 @@ runTrialSimulation <- function(prob_true_list, drugCombinationModel, drugcombi_n
     # Update PIPE estimator
     pipe_hat$updateEpsilonWithTapering(
       n_total = patientDataModel$maxCohorts,
-      n_current = patientDataModel$currentCohort - 1
+      n_current = patientDataModel$currentCohort
     )
     temp <- pipe_hat$updatePipeEstimator(p_posterior)
     
     # Store iteration results
-    simulation_results[[patientDataModel$currentCohort]] <- list(
+    simulation_results[[patientDataModel$currentCohort-1]] <- list(
         dose_level = patientDataModel$currentDoseLevel,
         p_posterior = p_posterior,
         best_config = pipe_hat$bestConfigs$currentConfig
