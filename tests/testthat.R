@@ -7,6 +7,6 @@
 # * https://testthat.r-lib.org/articles/special-files.html
 
 library(testthat)
-library(PIPEworks)
+library(gPIPE)
 
-test_check("PIPEworks")
+test_check("gPIPE")

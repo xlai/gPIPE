@@ -1,5 +1,5 @@
-Package: PIPEworks
-Title: n Integrated R Package for Dose Escalation Studies Using the PIPE Method
+Package: gPIPE
+Title: An Integrated R Package for Dose Escalation Studies Using the PIPE Method
 Version: 0.0.0.9000
 Authors@R: 
     person("Xiaoran", "Lai", , "research@xlai.org", role = c("aut", "cre"),
