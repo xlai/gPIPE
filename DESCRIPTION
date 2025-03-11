@@ -14,12 +14,47 @@ License: GPL (>= 3)
 Imports: 
     yaml,
     dplyr,
-    ggplot2
+    ggplot2,
+    cowplot,
+    gganimate,
+    tidyr,
+    RColorBrewer
 Suggests: 
-    testthat (>= 3.0.0)
+    testthat (>= 3.0.0),
     bookdown,
-    knitr    
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr
 Config/testthat/edition: 3
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
+Collate:
+    'DrugCombiConstructor.R'
+    'TrialConstructor.R'
+    'DoseConfigurator.R'
+    'PIPEConstructor.R'
+    'DoseModelConstructor.R'
+    'DrugConstructor.R'
+    'findBetaHyper.R'
+    'generate_gamma_config.R'
+    'runTrialSimulation.R'
+    'strategies-AdmissibleCombinationRule.R'
+    'strategies-SelectionStrategy.R'
+    'strategies-admissible-Adjacent.R'
+    'strategies-admissible-BorderAdmissible.R'
+    'strategies-admissible-Closest.R'
+    'strategies-admissible-Neighbour.R'
+    'strategies-admissible-Safety.R'    
+    'strategies-selection-equal_randomisation.R'
+    'strategies-selection-inverse_distance.R'
+    'strategies-selection-inverse_sqrt_samplesize.R'
+    'strategies-selection-posterior_probability.R'
+    'strategies-selection-smallest_samplesize.R'
+    'utils-calculate_neighbour_sum.R'
+    'utils-calibrateEpsilon.R'
+    'utils-monotonicMatrices.R'
+    'visual-plotFunctions.R'
+    'visual-summaryTables.R'
+    
+    

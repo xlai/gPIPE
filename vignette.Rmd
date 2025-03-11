@@ -26,7 +26,7 @@ if (!requireNamespace("yaml", quietly = TRUE)) {
     install.packages("yaml")
 }
 library(yaml)
-#library(kableExtra) # For knitting dataframes
+library(kableExtra) # For knitting dataframes
 library(dplyr)
 library(ggplot2)
 ```
