@@ -1,0 +1,260 @@
+---
+title: "Using the gPIPE Package for Dose-Finding Studies"
+author: "Xiaoran Lai"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Using the gPIPE Package for Dose-Finding Studies}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 7, 
+  fig.height = 5
+)
+```
+
+
+# Introduction
+This vignette demonstrates the use of the gPIPE package for dose-finding studies. 
+The package implements a generalized Product of Independent Beta Probabilities Escalation (PIPE) design with epsilon-tapering. The key components include:
+
+- `Drug`: Manages drug information and dose levels
+- `DrugCombination`: Handles combinations of drugs and their dose levels
+- `DoseConfiguration`: Manages dose configurations
+- `PipeEstimator`: Implements the core PIPE methodology
+- `PatientDataModel`: Tracks patient data throughout the trial
+
+# Getting Started
+First, we load the required packages:
+```{r pkg-setup, echo = TRUE}
+library(gPIPE)
+library(dplyr)
+```
+
+# Constructors
+
+## Drug Class
+The Drug class is designed to manage drug information, including its name and dose levels. 
+It offers a versatile way of initializing drug data either programmatically or with parameters.
+
+We can create the object directly:
+```{r, echo = TRUE}
+# Create a drug with 3 dose levels
+num_doses <- 3
+drugA <- createDrug(name = 'drugA', doseCount = num_doses)
+
+# Create drugs with specific dose levels and labels
+drug1 <- createDrug(name = 'Drug1', doseCount = num_doses)
+drug2 <- createDrug(name = 'Drug2', doseCount = num_doses)
+
+# Create a list of drugs for combination use
+drug_list <- list(drug1, drug2)
+```
+
+### Working with Drug Objects
+
+### Get dose informations
+```{r, echo = TRUE}
+# Get dose labels for Drug1
+drug_labels <- drug1$getDoseLabels()
+print(drug_labels)
+
+# Get numeric level for "dose2" dose level
+dose_levelA <- drugA$getDoseLevels("dose2")
+print(dose_levelA)
+
+# Add a new dose level
+drugA$addDose(new_label = "Extra", new_level = 4)
+
+# Get updated dose labels 
+updated_labels <- drugA$getDoseLabels()
+print(updated_labels)
+```
+
+## Drug Combination Class
+
+The `DrugCombi` class, short for Drug Combination, is designed for managing combinations of different drugs and their respective dose levels. 
+It is a composite constructor of multiple drugs that gives additional methods uniquely defined for drug combinations.
+
+```{r, echo = TRUE}
+# Create a drug combination object using our list of drugs
+drugcombi <- createDrugCombi(drugs = drug_list)
+
+# Get all possible dose combinations
+dose_combinations <- drugcombi$getDoseCombinationsLevel()
+print(dose_combinations)
+```
+
+## Dose Configuration Class
+
+The DoseConfiguration class manages dose configurations for dose-finding studies. 
+Let's create valid dose configurations that satisfy monotonicity constraints:
+
+```{r dose-configs-best, echo = TRUE, cache=TRUE}
+# Generate monotonic matrices for a dose grid
+num_doses_a <- 3
+num_doses_b <- 3
+all_configs <- monotonic_matrices(num_doses_a, num_doses_b, "decreasing")
+all_configs <- lapply(all_configs, function(x) c(x))
+
+# Create dose configuration objects
+dose_configs <- lapply(all_configs,
+    function(x) createDoseConfig(
+        drugCombiObject = drugcombi, 
+        isNonDecreasing = FALSE, 
+        currentConfig = as.numeric(x)
+    )
+)
+
+# Keep only valid configurations
+dose_configs_valid <- Filter(function(x) x$isValid, dose_configs)
+```
+
+## PIPE Estimator Class
+The PipeEstimator class implements the core PIPE methodology. It takes a list of valid dose configurations and evaluates the posterior gain of each configuration.
+The tuning parameters `epsilon` and `weight` can be fixed or adaptive at each update.
+
+```{r, echo = TRUE}
+# Create a PIPE estimator with linear tapering
+pipe_hat <- createPipeEstimator(
+    validConfigs = dose_configs_valid, 
+    epsilonTarget = 0.5, 
+    taper_type = 'linear'
+)
+```
+
+## PatientDataModel Class
+
+The PatientDataModel class tracks patient data throughout a trial:
+
+Create a PatientDataModel object:
+```{r, echo = TRUE}
+# Create a patient data model
+patientDataModel <- createPatientDataModel(drugcombi, startingDoseLevel = 'dose1.dose1')
+patientDataModel$resetTrial()
+
+# Add individual patient data
+patientDataModel$addPatientData(doseCombination = "dose1.dose1", outcome = 0, cohort = 1)
+patientDataModel$addPatientData(doseCombination = "dose2.dose2", outcome = 1, cohort = 2)
+patientDataModel$addPatientData(doseCombination = "dose2.dose1", outcome = 1, cohort = 3)
+```
+
+Summary statistics for each dose level combination can be printed for furhter processing.
+We can toggle between printing all dose levels or only those onto which patients enrolled.
+
+```{r}
+# Get summary statistics for doses that have patients enrolled
+summaryStats <- patientDataModel$getSummaryStats(includeAllCombi = FALSE)
+print(summaryStats)
+
+# Generate random patient data up to a specified dose level
+patientDataModel$generateRandomPatientData(
+    doseLevel = "dose2.dose2",
+    numPatients = 5,
+    outcomeProb = 0.1
+)
+
+# View patient data
+head(patientDataModel$patientData)
+```
+
+## Drug Combination Model Class
+The `DrugCombinationModel` constructor allows the initialisation and update of the statistical model used for each
+drug combination level. Depending on the model (currently only binomial and normal distribution for binary and continuous outcomes, respectively)
+, it reads in prior information, including hyperparameters, from a YAML file, and update the posterior of interest based on the patient data that are
+fed into the model.
+```{r, echo = TRUE}
+# Create a DrugCombinationModel object with default priors
+config_list <- list(
+    theta = 0.3,
+    priorA = 0.5,
+    priorB = 0.5
+)
+
+drugCombinationModel <- createDrugCombinationModel(
+    config_list = config_list,
+    family = "binomial"
+)
+
+# Update the model based on patient data
+updatedModel_posterior <- drugCombinationModel$updateModel(patientDataModel)
+
+# View a sample of the updated posterior probabilities
+head(updatedModel_posterior)
+```
+
+# PIPE estimator update
+
+Once the posterior for the parameter of interest is calculated, we can then pass it onto the `PipeEstimator` to update
+the posterior gain to select the best config so far
+```{r, echo = TRUE}
+# Update PIPE estimator with posterior probabilities
+pipe_hat$updatePipeEstimator(updatedModel_posterior)
+```
+
+# Conducting a dual-agent dose-escalation trial using PIPE design
+## Initialisation
+Let us first define the dose levels for each drug under investigation in the trial. 
+This can be done either through reading information from a YAML file with specific dose levels, or initialised without.
+
+```{r, echo = TRUE}
+# Set up drugs for the trial
+num_doses_a <- 5
+num_doses_b <- 3
+drugA <- createDrug(name = 'drugA', doseCount = num_doses_a)
+drugB <- createDrug(name = 'drugB', doseCount = num_doses_b)
+drug_list <- list(drugA, drugB)
+
+# Create drug combination
+drugcombi_new <- createDrugCombi(drugs = drug_list) 
+
+# Get available dose combinations
+dose_combinations <- drugcombi_new$getDoseCombinationsLevel()
+names(dose_combinations)[1:5]
+```
+
+We will then set up the PIPE configurations and find the set of configurations that fulfills the partial-order constraint.
+Note that we would like our dose configuration to be equal to 1 if it the dose level is acceptable, and 0 otherwise.
+This means that we will set `isNonDecreasing = FALSE` for non-increasing configurations.
+```{r new, echo = FALSE, cache=FALSE}
+# Generate valid dose configurations
+all_configs <- monotonic_matrices(num_doses_a, num_doses_b, "decreasing")
+all_configs <- lapply(all_configs, function(x) c(x))
+dose_configs_new <- lapply(all_configs,
+    function(x) createDoseConfig(
+        drugCombiObject = drugcombi_new, 
+        isNonDecreasing = FALSE, 
+        currentConfig = as.numeric(x)
+    )
+)
+dose_configs_valid <- Filter(function(x) x$isValid, dose_configs_new)
+
+# Create PIPE estimator
+pipe_hat <- createPipeEstimator(
+    validConfigs = dose_configs_valid,
+    epsilonTarget = 0.5, 
+    taper_type = 'linear'
+)
+
+# Set up admissibility rules and selection strategies
+# Note: These classes are available in the package
+
+# Set trial parameters
+current_dose_level <- "dose1.dose1"
+cohort_size <- 2
+max_cohorts <- 20
+```
+
+# Conclusion
+The gPIPE package provides a comprehensive framework for implementing the generalized PIPE design with epsilon-tapering for dose-finding studies. This vignette has demonstrated the key components and workflow for designing and analyzing such studies.
+
+# References
+
+1. Mander, A. P., & Sweeting, M. J. (2015). A product of independent beta probabilities dose escalation design for dual-agent phase I trials. *Statistics in medicine*, 34(8), 1261-1276. <doi:10.1002/sim.6434>
+
+2. Cheung, Y. K., Chandereng, T., & Diaz, K. M. (2022). A novel framework to estimate multidimensional minimum effective doses using asymmetric posterior gain and epsilon-tapering. *The annals of applied statistics*, 16(3), 1445. <doi:10.1214/21-AOAS1603>

@@ -1,14 +1,62 @@
-Package: PIPEworks
-Title: n Integrated R Package for Dose Escalation Studies Using the PIPE Method
+Package: gPIPE
+Title: Generalized PIPE Design with Epsilon-Tapering for Dose-Finding Studies
 Version: 0.0.0.9000
 Authors@R: 
-    person("Xiaoran", "Lai", , "research@xlai.org", role = c("aut", "cre"),
-           comment = c(ORCID = "YOUR-ORCID-ID"))
-Description: A bayesian method for dose escalation studies.
+    person("Xiaoran", "Lai", , "research@xlai.org", role = c("aut", "cre", "cph"),
+           comment = c(ORCID = "0000-0002-7364-3993"))
+Description: Implements a generalized Product of Independent Beta Probabilities Escalation (PIPE) 
+    design incorporating epsilon-tapering for dual-agent dose-finding studies. The package builds on 
+    two key methodological frameworks: the PIPE approach for dual-agent trials by Mander and 
+    Sweeting (2015) <doi:10.1002/sim.6434> "A product of independent beta probabilities dose 
+    escalation design for dual-agent phase I trials", and Cheung et al.'s (2022) 
+    <doi:10.1214/21-aoas1603> "A novel framework to estimate multidimensional minimum effective doses 
+    using asymmetric posterior gain and epsilon-tapering". The implementation features flexible admissibility 
+    rules, multiple dose selection strategies, and robust simulation tools for design calibration, 
+    evaluation, and comparison with existing dose-finding methodologies.
 License: GPL (>= 3)
+Imports: 
+    dplyr,
+    ggplot2,
+    cowplot,
+    tidyr,
+    RColorBrewer,
+    methods
 Suggests: 
-    testthat (>= 3.0.0)
+    testthat (>= 3.0.0),
+    bookdown,
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr
 Config/testthat/edition: 3
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.2.3
+RoxygenNote: 7.3.2
+Collate:
+    'DrugCombiConstructor.R'
+    'TrialConstructor.R'
+    'DoseConfigurator.R'
+    'PIPEConstructor.R'
+    'DoseModelConstructor.R'
+    'DrugConstructor.R'
+    'findBetaHyper.R'
+    'generate_gamma_config.R'
+    'runTrialSimulation.R'
+    'strategies-AdmissibleCombinationRule.R'
+    'strategies-SelectionStrategy.R'
+    'strategies-admissible-Adjacent.R'
+    'strategies-admissible-BorderAdmissible.R'
+    'strategies-admissible-Closest.R'
+    'strategies-admissible-Neighbour.R'
+    'strategies-admissible-Safety.R'    
+    'strategies-selection-equal_randomisation.R'
+    'strategies-selection-inverse_distance.R'
+    'strategies-selection-inverse_sqrt_samplesize.R'
+    'strategies-selection-posterior_probability.R'
+    'strategies-selection-smallest_samplesize.R'
+    'utils-calculate_neighbour_sum.R'
+    'utils-calibrateEpsilon.R'
+    'utils-monotonicMatrices.R'
+    'visual-plotFunctions.R'
+    'visual-summaryTables.R'
+URL: https://github.com/xlai/gPIPE
+BugReports: https://github.com/xlai/gPIPE/issues
