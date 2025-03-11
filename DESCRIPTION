@@ -18,7 +18,6 @@ Imports:
     dplyr,
     ggplot2,
     cowplot,
-    gganimate,
     tidyr,
     RColorBrewer,
     methods

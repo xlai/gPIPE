@@ -57,7 +57,11 @@ PatientDataModel <- setRefClass("PatientDataModel",
             selectionStrategy <<- selectionStrategyList
             currentCohort <<- 1
             # Initialize trial design parameters
-            startingDoseLevel <<- startingDoseLevel %||% names(drugCombi$getDoseCombinationsLevel())[1]
+            startingDoseLevel <<- if (is.null(startingDoseLevel)) {
+                names(drugCombi$getDoseCombinationsLevel())[1]
+            } else {
+                startingDoseLevel
+            }
             cohortSize <<- cohortSize
             maxCohorts <<- maxCohorts
             maxSampleSize <<- cohortSize * maxCohorts
