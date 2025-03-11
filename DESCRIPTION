@@ -15,7 +15,6 @@ Description: Implements a generalized Product of Independent Beta Probabilities 
     evaluation, and comparison with existing dose-finding methodologies.
 License: GPL (>= 3) + file LICENSE
 Imports: 
-    yaml,
     dplyr,
     ggplot2,
     cowplot,

@@ -12,7 +12,6 @@
 #' @field p_posterior Numeric vector of posterior probabilities
 #'
 #' @importFrom methods setRefClass
-#' @importFrom yaml yaml.load_file
 #' @seealso \code{\link{DrugCombination-class}} for the drug combination class that this model works with
 #' @export
 DrugCombinationModel <- setRefClass("DrugCombinationModel",
@@ -27,10 +26,10 @@ DrugCombinationModel <- setRefClass("DrugCombinationModel",
         #' @description
         #' Initialize a new DrugCombinationModel object
         #'
-        #' @param yamlConfig Path to YAML configuration file containing model parameters
+        #' @param config_list list of configurations containing model parameters
         #' @param family Character string specifying the distribution family ("binomial" or "gaussian")
-        initialize = function(yamlConfig, family = "binomial") {
-            config <- yaml::yaml.load_file(yamlConfig)
+        initialize = function(config_list, family = "binomial") {
+            config <- config_list
             theta <<- config$theta
             
             if (!is.null(config$priorA) && !is.null(config$priorB)) {
@@ -129,11 +128,11 @@ DrugCombinationModel <- setRefClass("DrugCombinationModel",
 #' This function creates a new DrugCombinationModel object, which implements
 #' the statistical model for a trial.
 #'
-#' @param yamlConfig Path to YAML configuration file containing model parameters
+#' @param config_list list of configuration containing model parameters
 #' @param family Character string specifying the distribution family ("binomial" or "gaussian")
 #'
 #' @return A DrugCombinationModel object
 #' @export
-createDrugCombinationModel <- function(yamlConfig, family = "binomial") {
-    return(DrugCombinationModel$new(yamlConfig, family))
+createDrugCombinationModel <- function(config_list, family = "binomial") {
+    return(DrugCombinationModel$new(config_list, family))
 }

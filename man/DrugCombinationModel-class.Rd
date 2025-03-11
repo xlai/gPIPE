@@ -6,7 +6,7 @@
 \alias{DrugCombinationModel}
 \title{Drug Combination Statistical Model}
 \arguments{
-\item{yamlConfig}{Path to YAML configuration file containing model parameters}
+\item{config_list}{list of configurations containing model parameters}
 
 \item{family}{Character string specifying the distribution family ("binomial" or "gaussian")}
 

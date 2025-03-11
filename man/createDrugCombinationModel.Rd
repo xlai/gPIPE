@@ -4,10 +4,10 @@
 \alias{createDrugCombinationModel}
 \title{Create a new DrugCombinationModel object}
 \usage{
-createDrugCombinationModel(yamlConfig, family = "binomial")
+createDrugCombinationModel(config_list, family = "binomial")
 }
 \arguments{
-\item{yamlConfig}{Path to YAML configuration file containing model parameters}
+\item{config_list}{list of configuration containing model parameters}
 
 \item{family}{Character string specifying the distribution family ("binomial" or "gaussian")}
 }

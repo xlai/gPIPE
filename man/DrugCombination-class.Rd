@@ -40,7 +40,7 @@ Print a summary of the drug combination
 }
 \details{
 A reference class that represents combinations of drugs.
-This class manages objects of the \code{\link{Drug}} class to create
+This class manages objects of the \code{\link{Drug-class}} class to create
 and manage combinations of different drugs at various dose levels.
 }
 \section{Fields}{

@@ -1,14 +1,14 @@
 #' Drug Combination Class
 #'
 #' A reference class that represents combinations of drugs.
-#' This class manages objects of the \code{\link{Drug}} class to create
+#' This class manages objects of the \code{\link{Drug-class}} class to create
 #' and manage combinations of different drugs at various dose levels.
 #'
 #' @field drugs List of Drug objects
 #' @field doseCombinations List of generated dose combinations
 #'
 #' @seealso \code{\link{Drug-class}} for the base drug class
-#' @importFrom methods setRefClass
+#' @importFrom methods setRefClass new
 #' @export
 DrugCombi <- setRefClass(
     "DrugCombination",
@@ -134,3 +134,63 @@ DrugCombi <- setRefClass(
         }
     )
 )
+
+#' Create a Drug Combination object
+#'
+#' This function creates a new DrugCombi object for managing combinations of drugs
+#' in dose-finding studies. It handles simple initialization with parameters or with
+#' pre-existing Drug objects.
+#'
+#' @param drugs List of \code{\link{Drug-class}} objects
+#' @param drug_A Optional list with settings for first drug, containing 'name' and 'dose_levels'
+#' @param drug_B Optional list with settings for second drug, containing 'name' and 'dose_levels'
+#'
+#' @return A new DrugCombi object
+#' 
+#' @details
+#' This function provides a convenient way to create a DrugCombi object either from
+#' existing Drug objects or by specifying the parameters for two drugs directly.
+#' 
+#' If `drugs` is provided, it should be a list of Drug objects.
+#' If `drug_A` and `drug_B` are provided, new Drug objects will be created with the specified parameters.
+#'
+#' @seealso \code{\link{Drug-class}} for the drug class, \code{\link{createDrug}} for creating Drug objects
+#' @export
+createDrugCombi <- function(drugs = NULL, drug_A = NULL, drug_B = NULL) {
+  # If the drugs list is provided, use it directly
+  if (!is.null(drugs)) {
+    return(DrugCombi$new(drugs = drugs))
+  }
+  
+  # If drug_A and drug_B parameters are provided, create Drug objects
+  drugs_list <- list()
+  
+  if (!is.null(drug_A)) {
+    if (is.list(drug_A) && "name" %in% names(drug_A)) {
+      if ("dose_levels" %in% names(drug_A)) {
+        drug1 <- Drug$new(name = drug_A$name, dose_levels = drug_A$dose_levels)
+      } else if ("doseCount" %in% names(drug_A)) {
+        drug1 <- createDrug(name = drug_A$name, doseCount = drug_A$doseCount)
+      } else {
+        drug1 <- createDrug(name = drug_A$name, doseCount = 3)
+      }
+      drugs_list <- c(drugs_list, list(drug1))
+    }
+  }
+  
+  if (!is.null(drug_B)) {
+    if (is.list(drug_B) && "name" %in% names(drug_B)) {
+      if ("dose_levels" %in% names(drug_B)) {
+        drug2 <- Drug$new(name = drug_B$name, dose_levels = drug_B$dose_levels)
+      } else if ("doseCount" %in% names(drug_B)) {
+        drug2 <- createDrug(name = drug_B$name, doseCount = drug_B$doseCount)
+      } else {
+        drug2 <- createDrug(name = drug_B$name, doseCount = 3)
+      }
+      drugs_list <- c(drugs_list, list(drug2))
+    }
+  }
+  
+  # Create and return the DrugCombi object
+  return(DrugCombi$new(drugs = drugs_list))
+}
