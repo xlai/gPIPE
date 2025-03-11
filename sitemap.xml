@@ -1,30 +1,57 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>/404.html</loc>
-  </url>
-  <url>
-    <loc>/CODE_OF_CONDUCT.html</loc>
-  </url>
-  <url>
-    <loc>/CONTRIBUTING.html</loc>
-  </url>
-  <url>
-    <loc>/LICENSE-text.html</loc>
-  </url>
-  <url>
-    <loc>/LICENSE.html</loc>
-  </url>
-  <url>
-    <loc>/SUPPORT.html</loc>
-  </url>
-  <url>
-    <loc>/authors.html</loc>
-  </url>
-  <url>
-    <loc>/index.html</loc>
-  </url>
-  <url>
-    <loc>/reference/index.html</loc>
-  </url>
+<urlset xmlns = 'http://www.sitemaps.org/schemas/sitemap/0.9'>
+<url><loc>/404.html</loc></url>
+<url><loc>/CODE_OF_CONDUCT.html</loc></url>
+<url><loc>/CONTRIBUTING.html</loc></url>
+<url><loc>/SUPPORT.html</loc></url>
+<url><loc>/articles/gPIPE.html</loc></url>
+<url><loc>/articles/index.html</loc></url>
+<url><loc>/authors.html</loc></url>
+<url><loc>/index.html</loc></url>
+<url><loc>/news/index.html</loc></url>
+<url><loc>/reference/AdjacentAdmissible-class.html</loc></url>
+<url><loc>/reference/AdmissibleCombinationRule-class.html</loc></url>
+<url><loc>/reference/BorderAdmissible-class.html</loc></url>
+<url><loc>/reference/ClosestAdmissible-class.html</loc></url>
+<url><loc>/reference/DoseConfiguration-class.html</loc></url>
+<url><loc>/reference/Drug-class.html</loc></url>
+<url><loc>/reference/DrugCombination-class.html</loc></url>
+<url><loc>/reference/DrugCombinationModel-class.html</loc></url>
+<url><loc>/reference/EqualRandomisationStrategy-class.html</loc></url>
+<url><loc>/reference/InverseDistanceStrategy-class.html</loc></url>
+<url><loc>/reference/InverseSqrtSampleSizeStrategy-class.html</loc></url>
+<url><loc>/reference/NeighbourAdmissible-class.html</loc></url>
+<url><loc>/reference/PatientDataModel-class.html</loc></url>
+<url><loc>/reference/PipeEstimator-class.html</loc></url>
+<url><loc>/reference/PosteriorProbabilityStrategy-class.html</loc></url>
+<url><loc>/reference/SafetyAdmissible-class.html</loc></url>
+<url><loc>/reference/SelectionStrategy-class.html</loc></url>
+<url><loc>/reference/SmallestSampleSizeStrategy-class.html</loc></url>
+<url><loc>/reference/calculateAdjacentDoses.html</loc></url>
+<url><loc>/reference/calculateClosestDoses.html</loc></url>
+<url><loc>/reference/calculateNeighbourSum.html</loc></url>
+<url><loc>/reference/calculate_cumulative_dlt.html</loc></url>
+<url><loc>/reference/calibrate_epsilon.html</loc></url>
+<url><loc>/reference/checkMonotonicity.html</loc></url>
+<url><loc>/reference/check_MTD_in_interval.html</loc></url>
+<url><loc>/reference/createDoseConfig.html</loc></url>
+<url><loc>/reference/createDrug.html</loc></url>
+<url><loc>/reference/createDrugCombi.html</loc></url>
+<url><loc>/reference/createDrugCombinationModel.html</loc></url>
+<url><loc>/reference/createPatientDataModel.html</loc></url>
+<url><loc>/reference/createPipeEstimator.html</loc></url>
+<url><loc>/reference/create_intervals.html</loc></url>
+<url><loc>/reference/create_summary_table.html</loc></url>
+<url><loc>/reference/findBorderIndices.html</loc></url>
+<url><loc>/reference/findNearestNeighbours.html</loc></url>
+<url><loc>/reference/find_closest_to_boundary.html</loc></url>
+<url><loc>/reference/index.html</loc></url>
+<url><loc>/reference/logGain.html</loc></url>
+<url><loc>/reference/monotonic_matrices.html</loc></url>
+<url><loc>/reference/plot_dlt_proportion.html</loc></url>
+<url><loc>/reference/plot_pipe_adaptation.html</loc></url>
+<url><loc>/reference/prepare_step_data.html</loc></url>
+<url><loc>/reference/sample_one.html</loc></url>
+<url><loc>/reference/slice_array_by_dimension.html</loc></url>
+<url><loc>/reference/tabulate_MTD.html</loc></url>
 </urlset>
+
