@@ -1,10 +1,35 @@
+#' Calculate Sum of Neighboring Elements in a Matrix
+#'
+#' This function calculates the sum of adjacent elements (up, down, left, and right)
+#' for each element in a matrix. The function is particularly useful in dose-finding studies
+#' for identifying boundary regions between acceptable and unacceptable dose combinations.
+#'
+#' @param A A numeric vector representing a flattened matrix
+#' @param matrixDims A numeric vector of length 2 containing the dimensions of the matrix:
+#'        c(number_of_columns, number_of_rows)
+#'
+#' @return A matrix of the same dimensions as the input matrix, where each element
+#'         contains the sum of its neighboring elements (up, down, left, and right)
+#'
+#' @details
+#' The function reshapes the input vector into a matrix of dimensions specified by `matrixDims`,
+#' pads the matrix with a border (1s on top, left, and part of right/bottom, 0s on the 
+#' bottom-right corner), and calculates the sum of the four adjacent elements for each position.
+#' 
+#' This is particularly useful for identifying transition boundaries in dose-toxicity matrices
+#' where a sum of 2 often indicates potential Maximum Tolerated Dose (MTD) positions.
+#'
+#' @examples
+#' # Create a sample binary matrix
+#' mat <- c(1, 1, 0, 1, 0, 0, 0, 0, 0)
+#' dims <- c(3, 3)  # 3 columns, 3 rows
+#' 
+#' # Calculate neighbor sums
+#' neighbor_sums <- calculateNeighbourSum(mat, dims)
+#' 
+#' @export
 calculateNeighbourSum <- function(A, matrixDims) {
 
-  # This function takes a vectorized matrix A and its dimensions (matrixDims) as input,
-  # reshapes A back into its matrix form, pads the matrix with a border, and then calculates
-  # the sum of the neighbouring elements (up, down, left, and right) for each element in the matrix.
-  # The result is a matrix of the same size where each element contains the sum of its neighbours.
-      
   # Calculate the number of rows and columns from matrixDims
     ncols <- matrixDims[1]
     nrows <- matrixDims[2] 

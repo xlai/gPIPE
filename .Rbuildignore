@@ -2,3 +2,7 @@
 ^codecov\.yml$
 ^gPIPE\.Rproj$
 ^\.Rproj\.user$
+^cran-comments\.md$
+^\.lintr$
+^README\.Rmd$
+^LICENSE\.md$

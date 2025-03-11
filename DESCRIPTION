@@ -2,15 +2,18 @@ Package: gPIPE
 Title: Generalized PIPE Design with Epsilon-Tapering for Dose-Finding Studies
 Version: 0.0.0.9000
 Authors@R: 
-    person("Xiaoran", "Lai", , "research@xlai.org", role = c("aut", "cre"),
+    person("Xiaoran", "Lai", , "research@xlai.org", role = c("aut", "cre", "cph"),
            comment = c(ORCID = "0000-0002-7364-3993"))
 Description: Implements a generalized Product of Independent Beta Probabilities Escalation (PIPE) 
-    design incorporating epsilon-tapering for dual-agent dose-finding studies. Building on Cheung et al.'s (2022) asymmetric posterior gain and 
-    epsilon-tapering framework, gPIPE improves dose-space exploration while effectively 
-    controlling false discovery rates. The implementation features flexible admissibility rules, 
-    multiple dose selection strategies, and robust simulation tools for design calibration, 
+    design incorporating epsilon-tapering for dual-agent dose-finding studies. The package builds on 
+    two key methodological frameworks: the PIPE approach for dual-agent trials by Mander and 
+    Sweeting (2015) <doi:10.1002/sim.6434> "A product of independent beta probabilities dose 
+    escalation design for dual-agent phase I trials", and Cheung et al.'s (2022) 
+    <doi:10.1214/21-AOAS1603> "A novel framework to estimate multidimensional minimum effective doses 
+    using asymmetric posterior gain and ϵ-tapering". The implementation features flexible admissibility 
+    rules, multiple dose selection strategies, and robust simulation tools for design calibration, 
     evaluation, and comparison with existing dose-finding methodologies.
-License: GPL (>= 3)
+License: GPL (>= 3) + file LICENSE
 Imports: 
     yaml,
     dplyr,
@@ -18,7 +21,8 @@ Imports:
     cowplot,
     gganimate,
     tidyr,
-    RColorBrewer
+    RColorBrewer,
+    methods
 Suggests: 
     testthat (>= 3.0.0),
     bookdown,
@@ -56,5 +60,5 @@ Collate:
     'utils-monotonicMatrices.R'
     'visual-plotFunctions.R'
     'visual-summaryTables.R'
-    
-    
+
+

@@ -1,3 +1,41 @@
+#' Generate All Monotonic Binary Matrices
+#'
+#' This function generates all possible binary (0/1) matrices of a given dimension
+#' that satisfy monotonicity constraints in both row and column directions.
+#' These matrices can be used to represent valid dose configurations in dose-finding studies
+#' where toxicity is assumed to be monotonic with respect to dose levels.
+#'
+#' @param I Integer specifying the number of rows
+#' @param J Integer specifying the number of columns
+#' @param direction Character string specifying the direction of monotonicity:
+#'    \itemize{
+#'      \item "increasing": Values increase or stay the same as row/column indices increase
+#'      \item "decreasing": Values decrease or stay the same as row/column indices increase
+#'    }
+#'
+#' @return A list of all possible monotonic binary matrices of dimension I×J
+#'
+#' @details
+#' For dose-finding studies, these matrices can represent valid dose-toxicity relationships:
+#'   \itemize{
+#'     \item 1 represents acceptable toxicity
+#'     \item 0 represents unacceptable toxicity
+#'   }
+#' 
+#' In the "increasing" direction, a dose is acceptable only if all lower doses are also acceptable.
+#' In the "decreasing" direction, a dose is unacceptable only if all higher doses are also unacceptable.
+#'
+#' The function uses a recursive approach to build all possible matrices that satisfy
+#' the monotonicity constraints.
+#'
+#' @examples
+#' # Generate all 2x2 matrices with increasing monotonicity
+#' matrices_inc <- monotonic_matrices(2, 2, "increasing")
+#' 
+#' # Generate all 2x2 matrices with decreasing monotonicity
+#' matrices_dec <- monotonic_matrices(2, 2, "decreasing")
+#'
+#' @export
 monotonic_matrices <- function(I, J, direction = c("increasing", "decreasing")) {
   direction <- match.arg(direction)
   

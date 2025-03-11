@@ -1,9 +1,25 @@
+#' Drug Class
+#'
+#' A reference class that represents a single drug with multiple dose levels.
+#' This class manages the dose levels and provides methods to interact with them.
+#'
+#' @field name Character string for the drug name
+#' @field doses List of dose levels with their corresponding names
+#'
+#' @importFrom methods setRefClass
+#' @export
 Drug <- setRefClass("Drug",
     fields = list(
         name = "character",
         doses = "list"
     ),
     methods = list(
+        #' @description
+        #' Initialize a new Drug object
+        #'
+        #' @param drugData List containing drug information from a YAML file
+        #' @param name Character string for the drug name
+        #' @param doseCount Numeric value for the number of dose levels
         initialize = function(drugData = NULL, name = NULL, doseCount = NULL) {
             if (!is.null(drugData)) {
                 # Initialize from YAML file
@@ -21,16 +37,35 @@ Drug <- setRefClass("Drug",
                 doses <<- list()
             }
         },
+        
+        #' @description
+        #' Get the dose labels in order
+        #'
+        #' @return Character vector of dose labels
         getDoseLabels = function() {
             # Returns the ordered dose labels for a given drug
             return(names(sort(unlist(doses))))
         },
+        
+        #' @description
+        #' Print a summary of the drug
         print = function() {
             cat("Drug Name:", name, "\nDose Levels:", .self$getDoseLabels(), "\n")
         },
+        
+        #' @description
+        #' Get the number of dose levels
+        #'
+        #' @return Numeric value of the number of dose levels
         getNumberOfDoseLevels = function() {
             return(length(doses))
         },
+        
+        #' @description
+        #' Get the dose levels
+        #'
+        #' @param doseLabel Optional character string for a specific dose label
+        #' @return Numeric vector of dose levels or a single dose level
         getDoseLevels = function(doseLabel = NULL) {
             # Validate input
             if (is.null(doseLabel)) {
@@ -44,6 +79,12 @@ Drug <- setRefClass("Drug",
                 return(as.numeric(doses[doseLabel]))
             }
         },
+        
+        #' @description
+        #' Add a new dose level
+        #'
+        #' @param new_label Optional character string for the new dose label
+        #' @param new_level Numeric value for the new dose level
         addDose = function(new_label = NULL, new_level) {
             # Validate input
             if (is.null(new_label)) {
@@ -72,10 +113,19 @@ Drug <- setRefClass("Drug",
     )
 )
 
-# Function to create a new Drug object
+#' Create a new Drug object
+#'
+#' This function creates one or more Drug objects based on the provided parameters.
+#'
+#' @param drugData Optional list containing drug information from a YAML file
+#' @param name Optional character string for the drug name
+#' @param doseCount Optional numeric value for the number of dose levels
+#'
+#' @return A Drug object or a list of Drug objects
+#' @export
 createDrug <- function(drugData = NULL, name = NULL, doseCount = NULL) {
     if (is.null(drugData)){
-        return( Drug$new(name = name, doseCount = doseCount))
+        return(Drug$new(name = name, doseCount = doseCount))
     }
     else{
         return(

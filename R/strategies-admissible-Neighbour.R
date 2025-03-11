@@ -1,7 +1,41 @@
+#' Neighbour-Based Admissibility Rule
+#'
+#' A reference class that implements a neighbour-based rule for determining which dose combinations
+#' are admissible in a dose-finding study. This rule restricts dose escalation or de-escalation
+#' to neighbouring dose combinations.
+#'
+#' @details
+#' The NeighbourAdmissible class implements the isAdmissible method by identifying dose combinations
+#' that are adjacent to the current dose level. This ensures that dose changes occur gradually,
+#' enhancing patient safety by preventing large jumps in dosing.
+#'
+#' @seealso 
+#' \code{\link{AdmissibleCombinationRule}} for the base class
+#' \code{\link{SafetyAdmissible}}, \code{\link{ClosestAdmissible}}, 
+#' \code{\link{BorderAdmissible}}, \code{\link{AdjacentAdmissible}} for other admissibility rules
+#'
+#' @examples
+#' \dontrun{
+#' # Create base admissible rule class first if needed
+#' library(gPIPE)
+#'
+#' # Create a NeighbourAdmissible rule
+#' neighbour_rule <- NeighbourAdmissible$new()
+#' }
+#'
+#' @importFrom methods setRefClass new
+#' @export
 NeighbourAdmissible <- setRefClass(
   "NeighbourAdmissible",
   contains = "AdmissibleCombinationRule", 
   methods = list(
+    #' @description
+    #' Determine if dose combinations are admissible based on proximity to current dose
+    #'
+    #' @param doseConfig DoseConfiguration object
+    #' @param currentDoseLevel Current dose level
+    #' @param ... Additional arguments (not used)
+    #' @return Vector of indices representing admissible dose combinations
     isAdmissible = function(doseConfig, currentDoseLevel, ...) {
       # Custom implementation
       best_config <- doseConfig$bestConfigs
@@ -12,7 +46,16 @@ NeighbourAdmissible <- setRefClass(
   )
 )
 
-
+#' Find Nearest Neighbours in a Matrix
+#'
+#' This function identifies the indices of neighboring cells in a matrix given a point index.
+#'
+#' @param pointIndex Integer index of the reference point in the matrix
+#' @param matrixDims Vector containing the dimensions of the matrix (columns, rows)
+#' @param degree Integer indicating the neighborhood degree (1 for immediate neighbors)
+#'
+#' @return Vector of indices representing neighbors of the reference point
+#' @keywords internal
 findNearestNeighbours <- function(pointIndex, matrixDims, degree = 1) {
   # Calculate the number of rows and columns from matrixDims
     cols <- matrixDims[1]

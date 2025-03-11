@@ -1,12 +1,34 @@
+#' Drug Combination Statistical Model
+#'
+#' A reference class that implements the statistical model behind dose combinations
+#' for dose-finding studies. This class provides methods for Bayesian inference using 
+#' beta priors and binomial likelihood to calculate posterior probabilities of toxicity 
+#' at different dose combinations.
+#'
+#' @field theta Numeric value representing the target toxicity probability threshold
+#' @field priorA Numeric vector of beta prior alpha parameters for each dose combination
+#' @field priorB Numeric vector of beta prior beta parameters for each dose combination
+#' @field family Character string specifying the distribution family ("binomial" or "gaussian")
+#' @field p_posterior Numeric vector of posterior probabilities
+#'
+#' @importFrom methods setRefClass
+#' @importFrom yaml yaml.load_file
+#' @seealso \code{\link{DrugCombination-class}} for the drug combination class that this model works with
+#' @export
 DrugCombinationModel <- setRefClass("DrugCombinationModel",
     fields = list(
-        theta = "numeric",
-        priorA = "numeric",
-        priorB = "numeric",
-        family = "character",
-        p_posterior = "numeric"
+        theta = "numeric",       # Target toxicity probability threshold
+        priorA = "numeric",      # Beta prior alpha parameters
+        priorB = "numeric",      # Beta prior beta parameters
+        family = "character",    # Distribution family
+        p_posterior = "numeric"  # Posterior probabilities
     ),
     methods = list(
+        #' @description
+        #' Initialize a new DrugCombinationModel object
+        #'
+        #' @param yamlConfig Path to YAML configuration file containing model parameters
+        #' @param family Character string specifying the distribution family ("binomial" or "gaussian")
         initialize = function(yamlConfig, family = "binomial") {
             config <- yaml::yaml.load_file(yamlConfig)
             theta <<- config$theta
@@ -34,6 +56,14 @@ DrugCombinationModel <- setRefClass("DrugCombinationModel",
             
             family <<- family
         },
+        
+        #' @description
+        #' Calculate posterior probability for one or all doses
+        #'
+        #' @param probValue Numeric value at which to evaluate the posterior CDF
+        #' @param summaryStats List with summary statistics for each dose combination
+        #' @param doseName Optional character string for a specific dose name
+        #' @return Numeric vector of posterior probabilities
         calculatePosterior = function(probValue, summaryStats, doseName = NULL) {
             # This function calculates posterior probabilities.
             # If doseName is provided, calculate for that dose. Otherwise, calculate for all doses.
@@ -63,6 +93,11 @@ DrugCombinationModel <- setRefClass("DrugCombinationModel",
             }
         },
         
+        #' @description
+        #' Update the model with patient data
+        #'
+        #' @param patientDataModel A obejct of class PatientDataModel containing the trial data
+        #' @return Numeric vector of updated posterior probabilities
         updateModel = function(patientDataModel) {
             # Extract summary statistics from patientDataModel
             summaryStats <- patientDataModel$getSummaryStats(includeAllCombi = TRUE)
@@ -89,7 +124,16 @@ DrugCombinationModel <- setRefClass("DrugCombinationModel",
     )
 )
 
-# Function to create a new DrugCombinationModel object
+#' Create a new DrugCombinationModel object
+#'
+#' This function creates a new DrugCombinationModel object, which implements
+#' the statistical model for a trial.
+#'
+#' @param yamlConfig Path to YAML configuration file containing model parameters
+#' @param family Character string specifying the distribution family ("binomial" or "gaussian")
+#'
+#' @return A DrugCombinationModel object
+#' @export
 createDrugCombinationModel <- function(yamlConfig, family = "binomial") {
     return(DrugCombinationModel$new(yamlConfig, family))
 }

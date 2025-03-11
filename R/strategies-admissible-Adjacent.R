@@ -1,7 +1,42 @@
+#' Adjacent Admissibility Rule
+#'
+#' A reference class that implements an admissibility rule based on adjacency to the
+#' current set of acceptable and unacceptable doses. This rule identifies doses that
+#' are immediately adjacent to the acceptance boundary.
+#'
+#' @details
+#' The AdjacentAdmissible class implements the isAdmissible method by identifying dose
+#' combinations that are adjacent to the current boundary between acceptable and unacceptable
+#' doses. This approach helps in efficiently exploring the dose-toxicity relationship by
+#' focusing on the region where the dose-toxicity relationship is changing.
+#'
+#' @seealso 
+#' \code{\link{AdmissibleCombinationRule}} for the base class
+#' \code{\link{NeighbourAdmissible}}, \code{\link{ClosestAdmissible}}, 
+#' \code{\link{BorderAdmissible}}, \code{\link{SafetyAdmissible}} for other admissibility rules
+#'
+#' @examples
+#' \dontrun{
+#' # Create base admissible rule class first if needed
+#' library(gPIPE)
+#' 
+#' # Create an AdjacentAdmissible rule
+#' adjacent_rule <- AdjacentAdmissible$new()
+#' }
+#'
+#' @importFrom methods setRefClass new
+#' @export
 AdjacentAdmissible <- setRefClass(
   "AdjacentAdmissible",
   contains = "AdmissibleCombinationRule", 
   methods = list(
+    #' @description
+    #' Determine if dose combinations are admissible based on adjacency to the acceptance boundary
+    #'
+    #' @param doseConfig DoseConfiguration object
+    #' @param currentDoseLevel Current dose level
+    #' @param ... Additional arguments (not used)
+    #' @return Vector of indices representing admissible dose combinations
     isAdmissible = function(doseConfig, currentDoseLevel, ...) {
       # Custom implementation
       best_config <- doseConfig$bestConfigs
@@ -12,6 +47,17 @@ AdjacentAdmissible <- setRefClass(
   )
 )
 
+#' Calculate Adjacent Doses
+#'
+#' This function identifies dose combinations that are adjacent to the boundary
+#' between acceptable and unacceptable doses.
+#'
+#' @param vec Binary vector representing the current dose configuration
+#' @param nrows Number of rows in the dose matrix
+#' @param ncols Number of columns in the dose matrix
+#'
+#' @return Binary matrix where TRUE indicates adjacent doses
+#' @keywords internal
 calculateAdjacentDoses <- function(vec, nrows, ncols) {
   # Ensure there are more than one level for both drugs
   if(nrows < 2 || ncols < 2) {

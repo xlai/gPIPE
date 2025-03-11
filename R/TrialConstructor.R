@@ -1,3 +1,23 @@
+#' Patient Data Model Class
+#'
+#' A reference class that manages patient data and trial progression in dose-finding studies.
+#' This class works with the \code{\link{DrugCombination-class}} class to track patient outcomes
+#' at different dose combinations, apply admissibility rules, and implement dose selection strategies.
+#'
+#' @field drugCombi An object of class \code{\link{DrugCombination-class}}
+#' @field patientData A data frame storing patient-level data
+#' @field admissibleRule A list of admissibility rule objects
+#' @field selectionStrategy A list of dose selection strategy objects
+#' @field currentCohort The current cohort number
+#' @field currentDoseLevel The current dose level being tested
+#' @field startingDoseLevel The starting dose level for the trial
+#' @field cohortSize The number of patients per cohort
+#' @field maxCohorts The maximum number of cohorts allowed in the trial
+#' @field maxSampleSize The maximum sample size (derived from cohortSize * maxCohorts)
+#'
+#' @importFrom methods setRefClass
+#' @seealso \code{\link{DrugCombination-class}} for the drug combination class that this model works with
+#' @export
 PatientDataModel <- setRefClass("PatientDataModel",
     fields = list(
         drugCombi = "DrugCombination",   # The DrugDose object
@@ -12,6 +32,15 @@ PatientDataModel <- setRefClass("PatientDataModel",
         maxSampleSize = "numeric"         # Derived from cohortSize * maxCohorts
     ),
     methods = list(
+        #' @description
+        #' Initialize a new PatientDataModel object
+        #'
+        #' @param drugCombiObject An object of class DrugCombination
+        #' @param admissibleRuleList A list of admissibility rules
+        #' @param selectionStrategyList A list of selection strategies
+        #' @param startingDoseLevel The starting dose level (character)
+        #' @param cohortSize The number of patients per cohort
+        #' @param maxCohorts The maximum number of cohorts
         initialize = function(drugCombiObject, 
                             admissibleRuleList = list(), 
                             selectionStrategyList = list(),
@@ -37,6 +66,13 @@ PatientDataModel <- setRefClass("PatientDataModel",
                 stop("Invalid starting dose level.")
             }
         },
+        
+        #' @description
+        #' Add patient data to the model
+        #'
+        #' @param doseCombination The dose combination administered to the patient
+        #' @param outcome The patient outcome (0 = no toxicity, 1 = toxicity)
+        #' @param cohort The cohort number
         addPatientData = function(doseCombination, outcome, cohort) {
             # Validate doseCombination
             if (!isDoseCombinationValid(doseCombination)) {
@@ -46,6 +82,9 @@ PatientDataModel <- setRefClass("PatientDataModel",
             # Adds patient data to the model
             patientData <<- rbind(patientData, data.frame(doseCombination = I(list(doseCombination)), outcome = outcome, cohort))
         },
+        
+        #' @description
+        #' Reset the trial to its initial state
         resetTrial = function() {
             patientData <<- data.frame(
                 doseCombination = I(list()),
@@ -56,6 +95,12 @@ PatientDataModel <- setRefClass("PatientDataModel",
             currentCohort <<- 1
             currentDoseLevel <<- startingDoseLevel
         },
+        
+        #' @description
+        #' Check if a dose combination is valid
+        #'
+        #' @param doseCombination The dose combination to validate
+        #' @return Logical indicating if the dose combination is valid
         isDoseCombinationValid = function(doseCombination) {
             # Check if each dose is valid for its corresponding drug
             if (!(doseCombination %in% names(drugCombi$doseCombinations))) {
@@ -63,6 +108,11 @@ PatientDataModel <- setRefClass("PatientDataModel",
             }
             return(TRUE)
         },
+        
+        #' @description
+        #' Set the current dose level
+        #'
+        #' @param doseLevel The dose level to set as current
         setCurrentDoseLevel = function(doseLevel) {
             # First, validate the dose level
             if (!isDoseCombinationValid(doseLevel)) {
@@ -71,7 +121,13 @@ PatientDataModel <- setRefClass("PatientDataModel",
             
             # Update the current dose level
             currentDoseLevel <<- doseLevel
-        },        
+        },
+        
+        #' @description
+        #' Get summary statistics for each dose combination
+        #'
+        #' @param includeAllCombi Logical indicating whether to include all combinations or only those with patient data
+        #' @return List of summary statistics for each dose combination
         getSummaryStats = function(includeAllCombi = TRUE) {
             # Computes summary statistics for each dose level combination
             summaryStats <- tapply(patientData$outcome, sapply(patientData$doseCombination, toString), function(x) {
@@ -85,6 +141,13 @@ PatientDataModel <- setRefClass("PatientDataModel",
             } 
             return(summaryStats)
         },
+        
+        #' @description
+        #' Generate random patient data for simulation
+        #'
+        #' @param outcomeProb Probability of toxicity for outcome generation
+        #' @param doseLevel Optional dose level (defaults to current dose level)
+        #' @param numPatients Optional number of patients (defaults to cohort size)
         generateRandomPatientData = function(outcomeProb, doseLevel = NULL, numPatients = NULL) {
             # If only outcomeProb provided, use object state
             if (is.null(doseLevel) && is.null(numPatients)) {
@@ -112,6 +175,14 @@ PatientDataModel <- setRefClass("PatientDataModel",
             # Update cohort
             currentCohort <<- currentCohort + 1
         },
+        
+        #' @description
+        #' Determine the next dose level based on admissibility rules and selection strategy
+        #'
+        #' @param currentLevel The current dose level
+        #' @param valid_dose_config Configuration of valid doses
+        #' @param drugCombiModel Drug combination model
+        #' @return Character string representing the next dose level
         getNextDoseLevel = function(currentLevel, valid_dose_config, drugCombiModel) {
             admissibleDoses <- lapply(admissibleRule, function(rule) rule$isAdmissible(valid_dose_config, currentLevel, drugCombiModel))
 
@@ -137,31 +208,53 @@ PatientDataModel <- setRefClass("PatientDataModel",
             }
             return(nextDose)
         },
+        
+        #' @description
+        #' Check if any stopping criteria have been met
+        #'
+        #' @return Logical indicating if stopping criteria have been met
         isStoppingCriteriaMet = function() {
             # For now, just check if we've exceeded maximum cohorts
             # Returns TRUE if trial should stop
             return(currentCohort > maxCohorts)
         },
-        # Can also add a method to get stopping reason if needed
+        
+        #' @description
+        #' Get the reason for stopping the trial
+        #'
+        #' @return Character string with stopping reason or NA if trial should continue
         getStoppingReason = function() {
             if (isStoppingCriteriaMet()) {
                 return("Maximum number of cohorts reached")
             }
             return(NA)  # No stopping reason if criteria not met
         },
+        
+        #' @description
+        #' Get the Maximum Tolerated Dose (MTD) indices
+        #'
+        #' @param doseConfig Dose configuration
+        #' @param drugCombiModel Drug combination model
+        #' @return Numeric vector of MTD indices or NA if none found
         getMTD = function(doseConfig, drugCombiModel){
             n_dose_level <- drugCombiModel$getNumberOfDoseLevels()
             # Calculate the neighbour sum using the provided function
             neighbour_sum <- calculateNeighbourSum(doseConfig, n_dose_level)
             mtd_indices <- which(neighbour_sum == 2 & doseConfig == 1)
             if (length(mtd_indices) == 0){
-#                cat('No MTD found.\n')
                 return(NA)
             }
             else{
                 return(mtd_indices)
             }            
         },
+        
+        #' @description
+        #' Get the Recommended Phase 2 Dose (RP2D) indices
+        #'
+        #' @param doseConfig Dose configuration
+        #' @param drugCombiModel Drug combination model
+        #' @return Numeric vector of RP2D indices or NA if none found
         getRP2D = function(doseConfig, drugCombiModel){
             n_dose_level <- drugCombiModel$getNumberOfDoseLevels()
             # Calculate the neighbour sum using the provided function
@@ -178,7 +271,20 @@ PatientDataModel <- setRefClass("PatientDataModel",
     )
 )
 
-# Function to create a new PatientDataModel object
+#' Create a new PatientDataModel object
+#'
+#' This function creates a new PatientDataModel object, which manages patient data and trial progression
+#' in dose-finding studies.
+#'
+#' @param drugDoseObject A DrugCombination object
+#' @param admissibleRuleList A list of admissibility rules
+#' @param selectionStrategyList A list of selection strategies
+#' @param startingDoseLevel The starting dose level (character)
+#' @param cohortSize The number of patients per cohort
+#' @param maxCohorts The maximum number of cohorts
+#'
+#' @return A PatientDataModel object
+#' @export
 createPatientDataModel <- function(drugDoseObject, 
                                  admissibleRuleList = list(),
                                  selectionStrategyList = list(),
@@ -196,6 +302,16 @@ createPatientDataModel <- function(drugDoseObject,
     ))
 }
 
+#' Find indices closest to a boundary
+#'
+#' This helper function finds indices of 0s that are adjacent to 1s in a matrix.
+#'
+#' @param vectorized_matrix A vectorized matrix representation
+#' @param nrow Number of rows in the matrix
+#' @param ncol Number of columns in the matrix
+#'
+#' @return Vector of indices closest to the boundary
+#' @keywords internal
 find_closest_to_boundary <- function(vectorized_matrix, nrow, ncol) {
   # Reshape the vectorized matrix into a 2D matrix
   matrix_2d <- matrix(vectorized_matrix, nrow = nrow, ncol = ncol, byrow = TRUE)
