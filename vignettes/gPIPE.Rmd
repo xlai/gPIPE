@@ -257,4 +257,4 @@ The gPIPE package provides a comprehensive framework for implementing the genera
 
 1. Mander, A. P., & Sweeting, M. J. (2015). A product of independent beta probabilities dose escalation design for dual-agent phase I trials. *Statistics in medicine*, 34(8), 1261-1276. <doi:10.1002/sim.6434>
 
-2. Cheung, Y. K., Chandereng, T., & Diaz, K. M. (2022). A novel framework to estimate multidimensional minimum effective doses using asymmetric posterior gain and ϵ-tapering. *The annals of applied statistics*, 16(3), 1445. <doi:10.1214/21-AOAS1603>
+2. Cheung, Y. K., Chandereng, T., & Diaz, K. M. (2022). A novel framework to estimate multidimensional minimum effective doses using asymmetric posterior gain and epsilon-tapering. *The annals of applied statistics*, 16(3), 1445. <doi:10.1214/21-AOAS1603>

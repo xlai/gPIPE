@@ -10,7 +10,7 @@ Description: Implements a generalized Product of Independent Beta Probabilities 
     Sweeting (2015) <doi:10.1002/sim.6434> "A product of independent beta probabilities dose 
     escalation design for dual-agent phase I trials", and Cheung et al.'s (2022) 
     <doi:10.1214/21-aoas1603> "A novel framework to estimate multidimensional minimum effective doses 
-    using asymmetric posterior gain and ϵ-tapering". The implementation features flexible admissibility 
+    using asymmetric posterior gain and epsilon-tapering". The implementation features flexible admissibility 
     rules, multiple dose selection strategies, and robust simulation tools for design calibration, 
     evaluation, and comparison with existing dose-finding methodologies.
 License: GPL (>= 3)
