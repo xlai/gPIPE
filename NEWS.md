@@ -1,4 +1,4 @@
-# gPIPE (development version)
+# gPIPE 0.1.0
 
 ## gPIPE 0.1.0
 

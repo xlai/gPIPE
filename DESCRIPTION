@@ -1,6 +1,6 @@
 Package: gPIPE
 Title: Generalized PIPE Design with Epsilon-Tapering for Dose-Finding Studies
-Version: 0.0.0.9000
+Version: 0.1.0
 Authors@R: 
     person("Xiaoran", "Lai", , "research@xlai.org", role = c("aut", "cre", "cph"),
            comment = c(ORCID = "0000-0002-7364-3993"))
