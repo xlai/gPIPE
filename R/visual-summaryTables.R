@@ -29,6 +29,7 @@ create_intervals <- function(target_DLT_prob, interval_width) {
 #' @param mode Categorization mode ('interval' or 'MTD')
 #'
 #' @return Data frame with categorized patient data
+#' @importFrom dplyr %>% mutate left_join
 #' @export
 create_summary_table <- function(prob_true_list, target_DLT_prob, indifference_interval, patientData, mode = "MTD") {
   # Validate input
@@ -55,7 +56,7 @@ create_summary_table <- function(prob_true_list, target_DLT_prob, indifference_i
   
   # Add true DLT probabilities to patientData
   patientData <- patientData %>%
-    dplyr::mutate(doseCombination = as.character(doseCombination)) %>%
+    dplyr::mutate(doseCombination = as.character(.data$doseCombination)) %>%
     dplyr::left_join(dose_probs_df, by = "doseCombination")
   
   # Switch between modes based on the provided flag
@@ -64,7 +65,7 @@ create_summary_table <- function(prob_true_list, target_DLT_prob, indifference_i
     patientData <- patientData %>%
       dplyr::mutate(
         Interval = cut(
-          DLT_prob, 
+          .data$DLT_prob, 
           breaks = intervals, 
           labels = interval_labels, 
           right = TRUE
@@ -75,7 +76,7 @@ create_summary_table <- function(prob_true_list, target_DLT_prob, indifference_i
     patientData <- patientData %>%
       dplyr::mutate(
         Interval = ifelse(
-          DLT_prob >= lower_bound & DLT_prob <= upper_bound, 
+          .data$DLT_prob >= lower_bound & .data$DLT_prob <= upper_bound, 
           "Yes", 
           "No"
         )
