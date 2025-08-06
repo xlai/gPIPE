@@ -1,3 +1,4 @@
+#' @importFrom dplyr %>% pull
 runTrialSimulation <- function(prob_true_list, drugCombinationModel, drugcombi_new, pipe_hat, patientDataModel, seed = NULL) {
   
   if (!is.null(seed)) set.seed(seed)
@@ -27,7 +28,7 @@ runTrialSimulation <- function(prob_true_list, drugCombinationModel, drugcombi_n
         best_config = pipe_hat$bestConfigs$currentConfig
     )
     
-    current_dose_level_numeric <- drugcombi_new$getDoseCombinationsLevel(current_dose_level)
+    current_dose_level_numeric <- drugcombi_new$getDoseCombinationsLevel(patientDataModel$currentDoseLevel)
     next_dose_level_numeric <- patientDataModel$getNextDoseLevel(current_dose_level_numeric, pipe_hat, drugCombinationModel)
     if(is.na(next_dose_level_numeric)){
       break # Break if no doses found to continue the trial
@@ -41,7 +42,7 @@ runTrialSimulation <- function(prob_true_list, drugCombinationModel, drugcombi_n
       drugCombinationModel$calculatePosterior(drugCombinationModel$theta - 0.1, summStats)
   # Capture final patient data and RP2D
   final_patient_data <- patientDataModel$patientData
-  tried_doses <- sort(drugcombi_new$getDoseCombinationsLevel(final_patient_data %>% pull(doseCombination) %>% unlist() %>% unique()))
+  tried_doses <- sort(drugcombi_new$getDoseCombinationsLevel(final_patient_data %>% dplyr::pull(.data$doseCombination) %>% unlist() %>% unique()))
   RP2D <- tried_doses[which.max(p_posterior_mode[tried_doses])]
   MTD <- patientDataModel$getMTD(pipe_hat$bestConfigs$currentConfig, drugcombi_new)
   

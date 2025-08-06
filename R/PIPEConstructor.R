@@ -147,8 +147,8 @@ PipeEstimator <- setRefClass("PipeEstimator",
             }))
 
             df <- cbind(split_df, acceptable_doses, p_posterior) %>% dplyr::mutate(
-                drug1 = factor(drug1, levels=drug1[1:6]),
-                acceptable_doses = as.factor(acceptable_doses)
+                drug1 = factor(.data$drug1, levels=.data$drug1[1:6]),
+                acceptable_doses = as.factor(.data$acceptable_doses)
                 )
 
             # Create the plot

@@ -1,5 +1,6 @@
 # Objective function to minimize
 # Here, params is a vector of two elements: params[1] = a, params[2] = b
+#' @importFrom stats qbeta uniroot
 objective_function <- function(params, target_median, prior_ss) {
   a <- params
   median_estimate <- qbeta(0.5, a, prior_ss - a)
