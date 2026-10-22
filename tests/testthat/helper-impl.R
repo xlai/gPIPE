@@ -32,6 +32,13 @@ gpipe_impl <- function() {
       target <- match.arg(target)
       w <- pipe_weights(n, match.arg(weights))
       pipe_estimate(DoseGrid(levels = levels), pipe_gain(p, eps, w, target), target)
+    },
+    cheung_candidates = function(levels, gamma) cheung_candidates(DoseGrid(levels = levels), gamma),
+    ms_state = function(spec) {
+      p <- beta_exceedance(spec$theta, spec$a, spec$b, spec$n, spec$r)
+      ms_decide(DoseGrid(levels = spec$levels), p, spec$n, S = spec$a + spec$b + spec$n,
+                history = spec$history, admis = spec$admis, safety = spec$safety,
+                final = isTRUE(spec$final))
     }
   )
 }
