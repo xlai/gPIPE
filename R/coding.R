@@ -42,16 +42,18 @@ beta_prior_from_median <- function(median, strength, method = c("bisection", "ex
   list(a = strength * m, b = strength * (1 - m))
 }
 
-# pipe.design 0.5.1, beta.med()'s inner betaprior1(), step for step.
-beta_mean_bisection <- function(K, x, p = 0.5, tol = 1e-4) {
+# pipe.design 0.5.1, beta.med()'s inner betaprior1(), step for step, plus a
+# cap on the halvings so an extreme median or strength cannot loop forever.
+beta_mean_bisection <- function(K, x, p = 0.5, tol = 1e-4, max_iter = 200L) {
   m_lo <- 0
   m_hi <- 1
-  repeat {
+  for (i in seq_len(max_iter)) {
     m0 <- (m_lo + m_hi) / 2
     p0 <- stats::pbeta(x, K * m0, K * (1 - m0))
     if (p0 < p) m_hi <- m0 else m_lo <- m0
-    if (abs(p0 - p) < tol) return(m0)
+    if (abs(p0 - p) < tol) break
   }
+  m0
 }
 
 beta_mean_exact <- function(K, x, p = 0.5) {

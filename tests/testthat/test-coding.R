@@ -83,3 +83,10 @@ test_that("taper by patients matches Cheung et al. (2022)", {
   expect_true(all(diff(taper_eps(0:125, 125, 0.05)) < 0))
   expect_error(taper_eps(126, 125, 0.05), "between 0 and `N`")
 })
+
+test_that("bisection stops after its iteration cap", {
+  # tol = 0 can never be met, so only the cap ends the loop; the result is
+  # still the bisection's best mean.
+  m <- beta_mean_bisection(1, 0.3, tol = 0, max_iter = 200L)
+  expect_equal(stats::pbeta(0.3, m, 1 - m), 0.5, tolerance = 1e-8)
+})
