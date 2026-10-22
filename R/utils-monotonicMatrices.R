@@ -21,7 +21,7 @@
 #'     \item 1 represents acceptable toxicity
 #'     \item 0 represents unacceptable toxicity
 #'   }
-#' 
+#'
 #' In the "increasing" direction, a dose is acceptable only if all lower doses are also acceptable.
 #' In the "decreasing" direction, a dose is unacceptable only if all higher doses are also unacceptable.
 #'
@@ -31,7 +31,7 @@
 #' @examples
 #' # Generate all 2x2 matrices with increasing monotonicity
 #' matrices_inc <- monotonic_matrices(2, 2, "increasing")
-#' 
+#'
 #' # Generate all 2x2 matrices with decreasing monotonicity
 #' matrices_dec <- monotonic_matrices(2, 2, "decreasing")
 #'
