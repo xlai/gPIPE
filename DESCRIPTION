@@ -39,6 +39,7 @@ Collate:
     'grid.R'
     'coding.R'
     'solvers.R'
+    'rules.R'
     'DrugCombiConstructor.R'
     'TrialConstructor.R'
     'DoseConfigurator.R'
