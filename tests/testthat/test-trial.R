@@ -85,7 +85,8 @@ test_that("normal outcomes: pooled t posterior, known sigma while df < 1", {
 test_that("Cheung MED trial with normal outcomes", {
   g <- DoseGrid(levels = c(3, 3))
   truth <- list(mean = c(outer(c(0, 0.3, 0.6), c(0, 0.3, 0.6), `+`)), sd = 0.5)
-  des <- pipe_trial_design(g, outcome_normal(0.5, 0.5), "MED", N = 24, start = 9L, eps = 0.1)
+  des <- pipe_trial_design(g, outcome_normal(0.5, 0.5), "MED", N = 24, eps = 0.1)
+  expect_equal(des$start, 9L)
   sim <- pipe_simulate(des, truth, n_trials = 5, seed = 5)
   expect_true(all(sim$summary$n_enrolled == 24))
   expect_true(all(is.na(sim$summary$pick)))
@@ -100,7 +101,30 @@ test_that("design checks", {
   expect_error(pipe_trial_design(g, m, "MTD", N = 10, rule = "ms"), "binary")
   expect_error(pipe_trial_design(g, outcome_beta(0.3, 1, 1), "MED", N = 10, rule = "ms"), "MTD")
   expect_error(pipe_trial_design(g, m, "MED", N = 10, start = 5L), "start")
+  expect_error(pipe_trial_design(g, outcome_beta(0.3, 1, 1), "MTD", N = 10, rule = "ms",
+                                 eps = 0.2), "eps = 0.5")
+  expect_error(pipe_trial_design(g, outcome_beta(0.3, 1, 1), "MTD", N = 10, rule = "ms",
+                                 weights = "n+1"), "eps = 0.5")
   des <- pipe_trial_design(g, outcome_beta(0.3, 1, 1), "MTD", N = 10, rule = "ms")
   expect_equal(des$weights, "1")
   expect_equal(des$selection, "min_S")
+})
+
+test_that("default start: top dose for Cheung MED, combination 1 otherwise", {
+  g <- DoseGrid(levels = c(3, 4))
+  m <- outcome_normal(0.5, 1)
+  b <- outcome_beta(0.3, 1, 1)
+  expect_equal(pipe_trial_design(g, m, "MED", N = 10)$start, 12L)
+  expect_equal(pipe_trial_design(g, b, "MTD", N = 10)$start, 1L)
+  expect_equal(pipe_trial_design(g, b, "MTD", N = 10, rule = "ms")$start, 1L)
+  # subset grid without the top corner: the maximal combination with the
+  # largest index; without the bottom corner, the first kept combination
+  keep <- matrix(TRUE, 3, 4)
+  keep[3, 4] <- FALSE
+  keep[1, 1] <- FALSE
+  gs <- DoseGrid(levels = c(3, 4), keep = keep)
+  top <- pipe_trial_design(gs, m, "MED", N = 10)$start
+  expect_equal(unname(gs@combos[top, ]), c(2L, 4L))
+  expect_true(top %in% maximal_elements(gs, rep(TRUE, n_combos(gs))))
+  expect_equal(pipe_trial_design(gs, b, "MTD", N = 10)$start, 1L)
 })

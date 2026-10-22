@@ -9,7 +9,9 @@
 #   with n the patients enrolled so far (or eps itself without tapering), and
 #   the next dose is drawn from S1 u S0 with equal probability ("equal",
 #   Algorithm 1-EQ) or proportional to the probability of the favourable
-#   state ("prob", Algorithm 1-PP). The final estimate uses eps.
+#   state ("prob"). For MED this is Cheung's Algorithm 1-PP (proportional to
+#   p_jk); for MTD, proportional to 1 - p_jk is gPIPE's own generalisation.
+#   The final estimate uses eps.
 # - "ms": Mander & Sweeting (2015) as pipe.design 0.5.1 runs it, through
 #   ms_decide(). The trial stops early only through the safety rule, and then
 #   gives no RPII.
@@ -18,15 +20,18 @@
 #   grid, model:   a DoseGrid and an outcome model (outcome_beta(), ...);
 #   target:        "MTD" or "MED";
 #   N, cohort:     maximum number of patients and cohort size;
-#   start:         combination index of the first dose;
+#   start:         combination index of the first dose. Defaults to the top
+#                  dose for rule = "cheung" with target = "MED" (Cheung's
+#                  step 0; the maximal combination with the largest index on
+#                  a subset grid), and to combination 1 otherwise;
 #   rule:          "cheung" or "ms";
-#   eps, taper, weights, selection: as described above; for "ms" the
-#     estimate always uses eps = 0.5 and w = 1, and selection is one of
+#   eps, taper, weights, selection: as described above; "ms" always uses
+#     eps = 0.5 and w = 1 (other values are an error), and selection is one of
 #     ms_selection_weights()'s ("min_S" by default);
 #   admis, constraint, safety: M&S options, see ms_decide();
 #   delta, within_set: Riviere single pick, see riviere_pick().
 pipe_trial_design <- function(grid, model, target = c("MTD", "MED"), N, cohort = 1L,
-                              start = 1L, rule = c("cheung", "ms"), eps = 0.5, taper = TRUE,
+                              start = NULL, rule = c("cheung", "ms"), eps = 0.5, taper = TRUE,
                               weights = NULL, selection = NULL, admis = "closest",
                               constraint = "neighbouring", safety = 0.8, delta = 0.1,
                               within_set = TRUE) {
@@ -38,7 +43,15 @@ pipe_trial_design <- function(grid, model, target = c("MTD", "MED"), N, cohort =
   if (rule == "ms" && target != "MTD") {
     stop("The M&S rule is for MTD only.", call. = FALSE)
   }
-  if (!(start %in% seq_len(n_combos(grid)))) {
+  if (rule == "ms" && (eps != 0.5 || !is.null(weights) && weights != "1")) {
+    stop("The M&S rule uses eps = 0.5 and weights = \"1\"; it cannot take other values.",
+         call. = FALSE)
+  }
+  if (is.null(start)) {
+    K <- n_combos(grid)
+    start <- if (rule == "cheung" && target == "MED") max(maximal_elements(grid, rep(TRUE, K))) else 1L
+  }
+  if (length(start) != 1L || !(start %in% seq_len(n_combos(grid)))) {
     stop("`start` must be a combination index of the grid.", call. = FALSE)
   }
   if (!(N >= 1 && cohort >= 1)) {
