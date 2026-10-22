@@ -41,6 +41,7 @@ Roxygen: list(markdown = TRUE)
 Collate:
     'grid.R'
     'coding.R'
+    'solvers.R'
     'DrugCombiConstructor.R'
     'TrialConstructor.R'
     'DoseConfigurator.R'
