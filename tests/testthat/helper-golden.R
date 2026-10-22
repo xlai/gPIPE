@@ -12,6 +12,7 @@ json_doses <- function(x, I) {
 # pipe.design snapshots as a list of states, each with `spec` (input for
 # ms_state) and `expected` (outputs in combination-index form).
 read_pipe_design_states <- function(setting) {
+  skip_if_not_installed("jsonlite")
   f <- jsonlite::read_json(fixture_path(sprintf("pipe_design_%s.json", setting)))
   st <- f$meta[[setting]]
   I <- st$I

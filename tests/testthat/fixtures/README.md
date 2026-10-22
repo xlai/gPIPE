@@ -39,8 +39,10 @@ example on a 5 x 5 grid, for Algorithm 2-EQ (taper to eps = 0.0425, N = 125)
 and Algorithm 1-EQ (eps = 0.05). Levels are 1-based.
 
 - `p_printed`: the posterior probability printed for the dose just treated.
-- `p_used`: the same, except 1-EQ step 2, where the printed 0.95 equals
-  1 - eps after rounding; 0.9505 reproduces the paper.
+- `p_used`: the same, except 1-EQ step 2. The paper prints 0.95, which
+  equals 1 - eps, so the estimate there sits on a knife edge. The value
+  0.9505 is our substitution for the rounded print, not the paper's; it
+  reproduces the paper's MED set.
 - `med_hat`: the printed MED set after that subject, `;`-separated.
 
 With w = n + 1 and untried p = 0.5, all 24 MED sets reproduce, and every dose
