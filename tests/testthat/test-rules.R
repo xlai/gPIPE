@@ -58,12 +58,23 @@ test_that("closest rule treats inadmissible doses as neither", {
   expect_equal(ms_closest(g, rep(0L, 9), A), combo_index(g, c(2, 2)))
 })
 
+# The 2D matrix version of the adjacent rule from gPIPE 0.1.0
+# (calculateAdjacentDoses), kept here as a reference.
+adjacent_2d <- function(vec, nrows, ncols) {
+  mat <- matrix(vec, nrow = nrows, ncol = ncols)
+  up <- mat == 1 & (rbind(0, mat[-nrows, ]) == 0 | cbind(0, mat[, -ncols]) == 0 |
+                      rbind(0, cbind(0, mat[, -ncols])[-nrows, ]) == 0)
+  low <- mat == 0 & (rbind(mat[-1, ], 1) == 1 | cbind(mat[, -1], 1) == 1 |
+                       rbind(cbind(mat[, -1], 1)[-1, ], 1) == 1)
+  up | low
+}
+
 test_that("adjacent rule matches the 2D matrix version", {
   set.seed(4)
   g <- DoseGrid(levels = c(4, 5))
   C <- grid_upsets(g)
   for (r in sample(nrow(C), 30)) {
-    old <- which(c(calculateAdjacentDoses(C[r, ], 4, 5)))
+    old <- which(c(adjacent_2d(C[r, ], 4, 5)))
     expect_equal(ms_adjacent(g, C[r, ]), old)
   }
 })
