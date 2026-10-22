@@ -24,7 +24,7 @@ outcome_beta <- function(theta, a, b) {
 # Normal outcomes with a common unknown variance (Cheung et al. 2022 MED
 # setting). Cheung's p_jk cannot be reproduced exactly (his sigma is not
 # given), so gPIPE uses a pooled-variance t posterior under a flat prior:
-#   P(mu_k > theta) = pt((ybar_k - theta) / (s_p / sqrt(n_k)), df),
+#   P(mu_k > theta) is the t(df) CDF at (ybar_k - theta) / (s_p / sqrt(n_k)),
 # with df = sum(n_k - 1) over tried doses. While df < 1 (or s_p = 0) the known
 # `sigma0` is used with pnorm. Untried doses get p = 0.5.
 outcome_normal <- function(theta, sigma0) {
