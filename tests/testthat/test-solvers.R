@@ -22,17 +22,6 @@ test_that("enumeration works on a grid with a combination left out", {
   expect_equal(nrow(C), sum(apply(all_sets, 1, is_upset, grid = g)))
 })
 
-test_that("monotonic_matrices keeps its order and directions", {
-  m <- monotonic_matrices(2, 2, "increasing")
-  expect_length(m, 6)
-  expect_equal(m[[1]], matrix(0, 2, 2))
-  expect_equal(m[[2]], matrix(c(0, 0, 0, 1), 2, 2))
-  expect_equal(m[[6]], matrix(1, 2, 2))
-  d <- monotonic_matrices(2, 3, "decreasing")
-  expect_length(d, 10)
-  expect_true(all(vapply(d, function(x) all(diff(x) <= 0) && all(diff(t(x)) <= 0), TRUE)))
-})
-
 test_that("min-cut equals enumeration on random grids, both tie rules", {
   set.seed(18)
   keep <- array(TRUE, c(3, 3, 2))

@@ -44,26 +44,18 @@ Here's a basic example of setting up a dose-finding trial using gPIPE:
 ```{r example, eval=FALSE}
 library(gPIPE)
 
-# Create a drug combination trial
-trial <- DrugCombiConstructor$new(
-  drug_A = list(name = "Drug A", dose_levels = c(1, 3, 5, 10, 15)),
-  drug_B = list(name = "Drug B", dose_levels = c(0.1, 0.5, 1.5, 3, 5))
-)
+# 4 x 4 grid of two drugs, Mander & Sweeting design for the MTD
+grid <- DoseGrid(levels = c(A = 4, B = 4))
+design <- ms_design(grid, theta = 0.2, prior_median = 0.2, prior_strength = 1 / 16, N = 50)
 
-# Setup PIPE model with epsilon tapering
-pipe_model <- PIPEConstructor$new(
-  trial = trial,
-  target_dlt_rate = 0.3,
-  epsilon = 0.05
-)
+# Estimate and next dose from the data so far (one row per patient)
+data <- data.frame(A = c(1, 1, 2), B = c(1, 2, 2), y = c(0, 0, 1))
+estimate(design, data)
+next_dose(design, data)
 
-# Run a simulation
-results <- runTrialSimulation(
-  pipe_model = pipe_model,
-  n_simulations = 100,
-  cohort_size = 3,
-  max_sample_size = 36
-)
+# Simulate 1000 trials under a true toxicity scenario
+truth <- outer(c(0.04, 0.08, 0.12, 0.16), c(0, 0.06, 0.12, 0.18), `+`)
+sim <- simulate(design, nsim = 1000, seed = 1, truth = truth)
 ```
 
 ## Features
