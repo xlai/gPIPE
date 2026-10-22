@@ -39,7 +39,8 @@ pipe_final_set <- function(grid, gamma, target = c("MTD", "MED")) {
 # Single dose from a set (Riviere et al. 2014): among the tried doses, the one
 # with the largest posterior probability that pi lies in [theta - delta,
 # theta + delta]. `within_set = FALSE` searches all tried doses instead.
-# Returns NA when no dose qualifies.
+# Ties go to the dose with the smallest index. Returns NA when no dose
+# qualifies.
 riviere_pick <- function(set, theta, a, b, n, x, delta = 0.1, within_set = TRUE) {
   tried <- which(n > 0)
   pool <- if (within_set) intersect(set, tried) else tried
@@ -134,7 +135,9 @@ ms_selection_weights <- function(candidates, S,
 
 # One M&S decision on fixed data. p = P(pi > theta | data), n patients per
 # dose, S = a + b + n, history = doses given so far (one per cohort). With
-# `safety = NULL` the safety rule is off and no q is computed.
+# `safety = NULL` the safety rule is off and no q is computed. The safety
+# rule needs every up-set (grid_upsets()), so with it on ms_decide() is for
+# grids of one or two drugs, or other small grids, only.
 #
 # Returns p, the mode contour, q, the safe, constraint and admissible sets,
 # and whether the trial stops (no admissible dose; pipe.design gives no RPII
