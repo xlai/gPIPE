@@ -10,7 +10,9 @@
 
 * Local: Linux, R 4.5.3 (`R CMD check --as-cran --no-manual`)
 * GitHub Actions:
-  * Ubuntu 24.04, R 4.4.2
+  * macOS (latest), R release
+  * Windows (latest), R release
+  * Ubuntu (latest), R release, oldrel-1 and devel
 
 ## Downstream dependencies
 
