@@ -81,9 +81,8 @@ pipe_trial_design <- function(grid, model, target = c("MTD", "MED"), N, cohort =
 #                   for "cheung", the RPII for "ms" (empty when stopped);
 #   pick:           single dose by Riviere's rule (binary MTD only, else NA).
 pipe_trial <- function(design, truth) {
-  grid <- design$grid
   model <- design$model
-  K <- n_combos(grid)
+  K <- n_combos(design$grid)
   N <- design$N
   n <- integer(K)
   s1 <- s2 <- numeric(K)
@@ -99,45 +98,65 @@ pipe_trial <- function(design, truth) {
     s2[dose] <- s2[dose] + sum(y^2)
     doses <- c(doses, dose)
     if (sum(n) >= N) break
-    p <- model$exceedance(n, s1, s2)
-    if (design$rule == "cheung") {
-      eps_n <- if (design$taper) taper_eps(sum(n), N, design$eps) else design$eps
-      gamma <- trial_estimate(design, p, n, eps_n)
-      cand <- cheung_candidates(grid, gamma)
-      fav <- if (design$target == "MED") p[cand] else 1 - p[cand]
-      prob <- if (design$selection == "equal") rep(1, length(cand)) else fav
-      dose <- draw_dose(cand, prob)
-    } else {
-      dec <- ms_decide(grid, p, n, S = model$a + model$b + n, history = doses,
-                       admis = design$admis, constraint = design$constraint,
-                       safety = design$safety, selection = design$selection,
-                       start = design$start)
-      if (dec$stopped) {
-        stopped <- TRUE
-        break
-      }
-      dose <- draw_dose(seq_len(K), dec$prob)
+    step <- trial_step(design, n, s1, s2, doses)
+    if (step$stopped) {
+      stopped <- TRUE
+      break
     }
+    dose <- draw_dose(seq_len(K), step$prob)
   }
+  c(list(n = n, s1 = s1, s2 = s2, doses = doses, n_enrolled = sum(n), stopped = stopped),
+    trial_final(design, n, s1, s2, doses, stopped)[c("gamma", "final_set", "pick")])
+}
 
+# Next-dose weights over all combinations after the data so far (history =
+# doses given, in order). `stopped` is TRUE when the M&S safety rule leaves no
+# admissible dose.
+trial_step <- function(design, n, s1, s2, history) {
+  K <- n_combos(design$grid)
+  p <- design$model$exceedance(n, s1, s2)
+  prob <- numeric(K)
+  if (design$rule == "cheung") {
+    eps_n <- if (design$taper) taper_eps(sum(n), design$N, design$eps) else design$eps
+    gamma <- trial_estimate(design, p, n, eps_n)
+    cand <- cheung_candidates(design$grid, gamma)
+    fav <- if (design$target == "MED") p[cand] else 1 - p[cand]
+    prob[cand] <- if (design$selection == "equal" || !any(fav > 0)) 1 else fav
+    return(list(p = p, gamma = gamma, prob = prob / sum(prob), stopped = FALSE))
+  }
+  model <- design$model
+  dec <- ms_decide(design$grid, p, n, S = model$a + model$b + n, history = history,
+                   admis = design$admis, constraint = design$constraint,
+                   safety = design$safety, selection = design$selection, start = design$start)
+  list(p = p, gamma = dec$mode, q = dec$q, prob = if (dec$stopped) prob else dec$prob,
+       stopped = dec$stopped)
+}
+
+# Final estimate after the data so far: p, gamma (with eps itself), the final
+# set (MTD/MED set for "cheung", RPII for "ms", empty when stopped), Riviere's
+# pick (binary MTD only, else NA) and, for "ms", q.
+trial_final <- function(design, n, s1, s2, history, stopped = FALSE) {
+  grid <- design$grid
+  model <- design$model
   p <- model$exceedance(n, s1, s2)
+  q <- NULL
   if (design$rule == "cheung") {
     gamma <- trial_estimate(design, p, n, design$eps)
     final_set <- pipe_final_set(grid, gamma, design$target)
   } else {
-    dec <- ms_decide(grid, p, n, S = model$a + model$b + n, history = doses,
+    dec <- ms_decide(grid, p, n, S = model$a + model$b + n, history = history,
                      admis = design$admis, constraint = design$constraint,
                      safety = design$safety, start = design$start, final = TRUE)
     gamma <- dec$mode
-    final_set <- if (stopped) integer() else dec$rpII
+    q <- dec$q
+    final_set <- if (stopped || dec$stopped) integer() else dec$rpII
   }
   pick <- NA_integer_
   if (model$family == "binary" && design$target == "MTD" && length(final_set)) {
     pick <- riviere_pick(final_set, model$theta, model$a, model$b, n, s1,
                          delta = design$delta, within_set = design$within_set)
   }
-  list(n = n, s1 = s1, s2 = s2, doses = doses, n_enrolled = sum(n), stopped = stopped,
-       gamma = gamma, final_set = final_set, pick = pick)
+  list(p = p, gamma = gamma, q = q, final_set = final_set, pick = pick)
 }
 
 trial_estimate <- function(design, p, n, eps) {
@@ -154,17 +173,18 @@ draw_dose <- function(x, prob) {
   if (length(x) == 1L) x else sample(x, 1L, prob = prob[keep])
 }
 
-# Many trials. Returns the per-trial results (`trials`) and, over trials x
-# combinations, the patients (`n`), the events or outcome sums (`s1`), the
-# final estimate (`gamma`) and the final-set membership (`final_set`); and a
-# data frame with n_enrolled, stopped and pick per trial.
-pipe_simulate <- function(design, truth, n_trials, seed = NULL) {
+# Many trials. Returns the per-trial results (`trials`, empty unless
+# keep_trials) and, over trials x combinations, the patients (`n`), the
+# events or outcome sums (`s1`), the final estimate (`gamma`) and the
+# final-set membership (`final_set`); and a data frame with n_enrolled,
+# stopped and pick per trial.
+pipe_simulate <- function(design, truth, n_trials, seed = NULL, keep_trials = TRUE) {
   if (!is.null(seed)) set.seed(seed)
   K <- n_combos(design$grid)
   trials <- lapply(seq_len(n_trials), function(i) pipe_trial(design, truth))
   by_combo <- function(f) matrix(unlist(lapply(trials, f)), n_trials, K, byrow = TRUE)
   list(
-    trials = trials,
+    trials = if (keep_trials) trials else list(),
     n = by_combo(function(t) t$n),
     s1 = by_combo(function(t) t$s1),
     gamma = by_combo(function(t) t$gamma),
