@@ -10,6 +10,8 @@ experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](h
 [![CRAN
 status](https://www.r-pkg.org/badges/version/gPIPE)](https://CRAN.R-project.org/package=gPIPE)
 [![R-CMD-check](https://github.com/xlai/gPIPE/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/xlai/gPIPE/actions/workflows/R-CMD-check.yaml)
+[![Codecov test
+coverage](https://codecov.io/gh/xlai/gPIPE/graph/badge.svg)](https://app.codecov.io/gh/xlai/gPIPE)
 <!-- badges: end -->
 
 ## Generalized PIPE Design with Epsilon-Tapering for Dose-Finding Studies
