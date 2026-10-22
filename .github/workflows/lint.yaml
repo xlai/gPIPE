@@ -4,8 +4,8 @@
 # Lints the R files a pull request changes. Non-blocking for now: legacy code
 # does not follow the style yet, so lints are reported but do not fail CI.
 on:
+  # every PR, including stacked PRs whose base is a feature branch
   pull_request:
-    branches: [main, dev]
 
 name: lint-changed-files
 

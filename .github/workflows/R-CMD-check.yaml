@@ -5,8 +5,8 @@
 on:
   push:
     branches: [main, dev]
+  # every PR, including stacked PRs whose base is a feature branch
   pull_request:
-    branches: [main, dev]
   schedule:
     # weekly, Monday 06:00 UTC, so changes in R-devel surface early
     - cron: '0 6 * * 1'

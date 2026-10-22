@@ -5,8 +5,8 @@
 on:
   push:
     branches: [main, dev]
+  # every PR, including stacked PRs whose base is a feature branch
   pull_request:
-    branches: [main, dev]
   workflow_dispatch:
 
 name: test-coverage
