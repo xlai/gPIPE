@@ -1,3 +1,8 @@
+# gPIPE (development version)
+
+* Requires R >= 4.4.
+* CI: R CMD check on R-devel (non-blocking, weekly), release and oldrel-1 for `main` and `dev`; Codecov coverage reporting; lintr on changed files (#16).
+
 # gPIPE 0.1.0
 
 ## gPIPE 0.1.0
