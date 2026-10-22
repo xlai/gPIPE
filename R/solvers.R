@@ -59,11 +59,13 @@ solve_enumeration <- function(configs, d, largest = TRUE) {
 }
 
 # Mander & Sweeting (2015) safety: the posterior probability that each
-# combination is toxic, averaged over all up-sets with weights
-# softmax(C %*% d). With eps = 0.5 and w = 1, d = qlogis(p) and the weights
-# are the contour probabilities prod_U p_k prod_notU (1 - p_k), normalised.
-upset_exceedance <- function(configs, d) {
-  score <- drop(configs %*% d)
+# combination is toxic, averaged over all up-sets with weights proportional
+# to the contour probabilities prod_U p_k prod_notU (1 - p_k). That is
+# softmax(C %*% qlogis(p)). It takes p, not the design's d: q never uses the
+# design's eps or weights. p is clipped as in pipe_gain().
+upset_exceedance <- function(configs, p) {
+  p <- pmin(pmax(p, 1e-12), 1 - 1e-12)
+  score <- drop(configs %*% stats::qlogis(p))
   wts <- exp(score - max(score))
   drop(crossprod(configs, wts / sum(wts)))
 }
@@ -157,18 +159,20 @@ solve_mincut <- function(grid, d, largest = TRUE) {
 # ---- Estimate ---------------------------------------------------------------
 
 # PIPE estimate gamma (0/1 over the combinations) from score differences d.
-# method = "auto" enumerates on full grids of one or two drugs and uses
-# min-cut otherwise.
+# method = "auto" enumerates on full grids of one or two drugs with at most
+# `max_enumerate` up-sets, and uses min-cut otherwise.
 pipe_estimate <- function(grid, d, target = c("MTD", "MED"),
-                          method = c("auto", "enumerate", "mincut")) {
+                          method = c("auto", "enumerate", "mincut"),
+                          max_enumerate = 1e4) {
   target <- match.arg(target)
   method <- match.arg(method)
   if (length(d) != n_combos(grid)) {
     stop("`d` must have one entry per combination.", call. = FALSE)
   }
   if (method == "auto") {
-    full <- !anyNA(grid@lookup)
-    method <- if (full && length(grid@levels) <= 2L) "enumerate" else "mincut"
+    small <- !anyNA(grid@lookup) && length(grid@levels) <= 2L &&
+      n_upsets_full(grid@levels) <= max_enumerate
+    method <- if (small) "enumerate" else "mincut"
   }
   largest <- target == "MTD"
   if (method == "enumerate") {
@@ -176,4 +180,9 @@ pipe_estimate <- function(grid, d, target = c("MTD", "MED"),
   } else {
     solve_mincut(grid, d, largest)
   }
+}
+
+# Number of up-sets of a full grid of one or two drugs: choose(I + J, I).
+n_upsets_full <- function(levels) {
+  if (length(levels) == 1L) levels + 1 else choose(sum(levels), levels[1])
 }

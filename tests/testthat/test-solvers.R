@@ -61,6 +61,24 @@ test_that("exact ties go to the smallest favourable set", {
   }
 })
 
+test_that("auto enumerates only small 2D grids", {
+  expect_equal(n_upsets_full(c(6, 6)), 924)
+  expect_equal(n_upsets_full(4), 5)
+  expect_equal(n_upsets_full(c(10, 10)), 184756)
+  # 10 x 10 goes to min-cut, so no up-sets are listed (and none cached)
+  g <- DoseGrid(levels = c(10, 10))
+  key <- paste(c(g@levels, "|", seq_len(100)), collapse = ",")
+  set.seed(10)
+  gamma <- pipe_estimate(g, stats::rnorm(100))
+  expect_true(is_upset(g, gamma))
+  expect_null(.solver_cache[[key]])
+  # with a lower limit, 6 x 6 goes to min-cut as well
+  local_mocked_bindings(grid_upsets = function(...) stop("enumerated"))
+  d <- stats::rnorm(36)
+  expect_silent(pipe_estimate(DoseGrid(levels = c(6, 6)), d, max_enumerate = 100))
+  expect_error(pipe_estimate(DoseGrid(levels = c(6, 6)), d), "enumerated")
+})
+
 test_that("auto uses enumeration in 2D and min-cut otherwise", {
   g2 <- DoseGrid(levels = c(5, 5))
   g3 <- DoseGrid(levels = c(2, 2, 2))
@@ -79,6 +97,6 @@ test_that("upset_exceedance is the M&S contour average", {
   # contour probability prod_U p prod_notU (1 - p), normalised
   prob <- apply(C, 1, function(u) prod(ifelse(u == 1, p, 1 - p)))
   prob <- prob / sum(prob)
-  expect_equal(upset_exceedance(C, stats::qlogis(p)), drop(crossprod(C, prob)))
-  expect_equal(upset_exceedance(C, pipe_gain(p, 0.5)), drop(crossprod(C, prob)))
+  expect_equal(upset_exceedance(C, p), drop(crossprod(C, prob)))
+  expect_true(all(is.finite(upset_exceedance(C, c(0, 1, 0, 1, 0, 1)))))
 })
