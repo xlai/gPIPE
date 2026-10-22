@@ -17,19 +17,11 @@ License: GPL (>= 3)
 Depends:
     R (>= 4.4)
 Imports: 
-    dplyr,
-    ggplot2,
-    cowplot,
-    tidyr,
-    RColorBrewer,
-    methods,
     S7,
-    stats,
-    utils
+    stats
 Suggests: 
     jsonlite,
     testthat (>= 3.0.0),
-    bookdown,
     knitr,
     rmarkdown
 VignetteBuilder: knitr
@@ -46,32 +38,6 @@ Collate:
     'outcomes.R'
     'trial.R'
     'api.R'
-    'DrugCombiConstructor.R'
-    'TrialConstructor.R'
-    'DoseConfigurator.R'
-    'PIPEConstructor.R'
-    'DoseModelConstructor.R'
-    'DrugConstructor.R'
-    'findBetaHyper.R'
-    'generate_gamma_config.R'
-    'runTrialSimulation.R'
-    'strategies-AdmissibleCombinationRule.R'
-    'strategies-SelectionStrategy.R'
-    'strategies-admissible-Adjacent.R'
-    'strategies-admissible-BorderAdmissible.R'
-    'strategies-admissible-Closest.R'
-    'strategies-admissible-Neighbour.R'
-    'strategies-admissible-Safety.R'    
-    'strategies-selection-equal_randomisation.R'
-    'strategies-selection-inverse_distance.R'
-    'strategies-selection-inverse_sqrt_samplesize.R'
-    'strategies-selection-posterior_probability.R'
-    'strategies-selection-smallest_samplesize.R'
-    'utils-calculate_neighbour_sum.R'
-    'utils-calibrateEpsilon.R'
-    'utils-monotonicMatrices.R'
-    'visual-plotFunctions.R'
-    'visual-summaryTables.R'
     'zzz.R'
 URL: https://github.com/xlai/gPIPE
 BugReports: https://github.com/xlai/gPIPE/issues
