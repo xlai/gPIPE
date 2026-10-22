@@ -3,6 +3,7 @@
 * Requires R >= 4.4.
 * CI: R CMD check on R-devel (non-blocking, weekly), release and oldrel-1 for `main` and `dev`; Codecov coverage reporting; lintr on changed files (#16).
 * New S7 class `DoseGrid` for dose combinations of any number of drugs, with helpers to convert between the array and vector views (#18).
+* Golden tests against pipe.design 0.5.1 decision snapshots and Cheung et al. (2022) Table 1, run per implementation so each refactor step enables its own tests (#17).
 
 # gPIPE 0.1.0
 
