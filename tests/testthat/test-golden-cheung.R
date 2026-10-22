@@ -31,23 +31,23 @@ replay_cheung <- function(impl, algorithm, check) {
 }
 
 for (algorithm in c("2-EQ", "1-EQ")) {
-  test_each_impl(sprintf("Cheung Table 1 MED estimates (%s)", algorithm), "estimate",
-    function(impl) {
-      replay_cheung(impl, algorithm, function(i, row, k, before, gamma) {
-        med <- ref_minimal(cheung_levels, gamma == 1)
-        expect_equal(sort(med), parse_dose_labels(row$med_hat, cheung_levels[1]),
-                     info = sprintf("%s step %d", algorithm, i))
-      })
+  desc <- sprintf("Cheung Table 1 MED estimates (%s)", algorithm)
+  test_each_impl(desc, "estimate", function(impl) {
+    replay_cheung(impl, algorithm, function(i, row, k, before, gamma) {
+      med <- ref_minimal(cheung_levels, gamma == 1)
+      expect_equal(sort(med), parse_dose_labels(row$med_hat, cheung_levels[1]),
+                   info = sprintf("%s step %d", algorithm, i))
     })
+  })
 
-  test_each_impl(sprintf("Cheung Table 1 doses lie in S1 u S0 (%s)", algorithm), "cheung_candidates",
-    function(impl) {
-      if (is.null(impl$estimate)) skip("no `estimate` in the adapter yet (#18)")
-      replay_cheung(impl, algorithm, function(i, row, k, before, gamma) {
-        expect_true(k %in% impl$cheung_candidates(cheung_levels, before),
-                    info = sprintf("%s step %d", algorithm, i))
-      })
+  desc <- sprintf("Cheung Table 1 doses lie in S1 u S0 (%s)", algorithm)
+  test_each_impl(desc, "cheung_candidates", function(impl) {
+    if (is.null(impl$estimate)) skip("no `estimate` in the adapter yet (#18)")
+    replay_cheung(impl, algorithm, function(i, row, k, before, gamma) {
+      expect_true(k %in% impl$cheung_candidates(cheung_levels, before),
+                  info = sprintf("%s step %d", algorithm, i))
     })
+  })
 }
 
 test_each_impl("S1 u S0 on the extreme configurations", "cheung_candidates", function(impl) {

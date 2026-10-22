@@ -25,21 +25,21 @@ expect_ms_state <- function(got, expected, id) {
 }
 
 for (setting in c("V5", "V6")) {
-  test_each_impl(sprintf("decisions match pipe.design snapshots (%s)", setting), "ms_state",
-    function(impl) {
-      for (s in read_pipe_design_states(setting)) {
-        expect_ms_state(impl$ms_state(s$spec), s$expected, s$id)
-      }
-    })
-}
-
-test_each_impl("trial stops when no neighbourhood dose is safe, even if d11 is", "ms_state",
-  function(impl) {
-    for (setting in c("V5", "V6")) {
-      s <- Filter(function(x) grepl("edge-safety-neighbourhood-empty", x$id),
-                  read_pipe_design_states(setting))[[1]]
-      got <- impl$ms_state(s$spec)
-      expect_true(1 %in% got$safe, info = s$id)
-      expect_true(got$stopped, info = s$id)
+  desc <- sprintf("decisions match pipe.design snapshots (%s)", setting)
+  test_each_impl(desc, "ms_state", function(impl) {
+    for (s in read_pipe_design_states(setting)) {
+      expect_ms_state(impl$ms_state(s$spec), s$expected, s$id)
     }
   })
+}
+
+desc <- "trial stops when no neighbourhood dose is safe, even if d11 is"
+test_each_impl(desc, "ms_state", function(impl) {
+  for (setting in c("V5", "V6")) {
+    s <- Filter(function(x) grepl("edge-safety-neighbourhood-empty", x$id),
+                read_pipe_design_states(setting))[[1]]
+    got <- impl$ms_state(s$spec)
+    expect_true(1 %in% got$safe, info = s$id)
+    expect_true(got$stopped, info = s$id)
+  }
+})

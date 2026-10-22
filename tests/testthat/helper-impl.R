@@ -7,14 +7,14 @@
 # so each refactor step (#18) makes its tests run by filling in the matching
 # entry of gpipe_impl():
 #
-#   enumerate(levels)              0/1 matrix of all up-sets, one row each,
-#                                  or NULL when the grid is not supported
-#   estimate(levels, p, n, eps, weights = c("1", "n+1"), target = c("MTD", "MED"))
-#                                  0/1 vector gamma; p = P(pi > theta | data)
-#   cheung_candidates(levels, gamma)
-#                                  combination indices of S1 u S0
-#   ms_state(spec)                 one M&S decision; see ref_ms_state() for the
-#                                  spec and the returned fields
+# - enumerate: takes levels; returns a 0/1 matrix of all up-sets, one row
+#   each, or NULL when the grid is not supported.
+# - estimate: takes levels, p, n, eps, weights ("1" or "n+1") and target
+#   ("MTD" or "MED"); returns the 0/1 vector gamma. p = P(pi > theta | data).
+# - cheung_candidates: takes levels and gamma; returns the combination
+#   indices of S1 u S0.
+# - ms_state: takes a spec; returns one M&S decision. See ref_ms_state() for
+#   the spec and the returned fields.
 
 reference_impl <- function() {
   list(
