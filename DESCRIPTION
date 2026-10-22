@@ -1,6 +1,6 @@
 Package: gPIPE
 Title: Generalized PIPE Design with Epsilon-Tapering for Dose-Finding Studies
-Version: 0.1.0
+Version: 0.1.0.9000
 Authors@R: 
     person("Xiaoran", "Lai", , "research@xlai.org", role = c("aut", "cre", "cph"),
            comment = c(ORCID = "0000-0002-7364-3993"))
@@ -14,6 +14,8 @@ Description: Implements a generalized Product of Independent Beta Probabilities 
     rules, multiple dose selection strategies, and robust simulation tools for design calibration, 
     evaluation, and comparison with existing dose-finding methodologies.
 License: GPL (>= 3)
+Depends:
+    R (>= 4.4)
 Imports: 
     dplyr,
     ggplot2,
