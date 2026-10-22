@@ -20,7 +20,9 @@ Imports:
     cowplot,
     tidyr,
     RColorBrewer,
-    methods
+    methods,
+    stats,
+    utils
 Suggests: 
     testthat (>= 3.0.0),
     bookdown,

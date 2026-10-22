@@ -60,6 +60,8 @@
 #'
 #' @seealso \code{\link{PipeEstimator}} for the class that uses epsilon in the PIPE methodology
 #' @import ggplot2
+#' @importFrom stats setNames
+#' @importFrom utils tail
 #' @export
 calibrate_epsilon <- function(dose_configs_valid,
                               epsilon_range,

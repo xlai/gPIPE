@@ -10,6 +10,8 @@
 #' @param expand_grid Whether to include all possible combinations
 #'
 #' @return Data frame with cumulative DLT proportions
+#' @importFrom dplyr %>% filter arrange group_by summarise ungroup mutate left_join
+#' @importFrom tidyr separate
 #' @export
 calculate_cumulative_dlt <- function(data, drugA, drugB, cohort_limit, expand_grid = FALSE) {
   # Input validation
@@ -19,25 +21,25 @@ calculate_cumulative_dlt <- function(data, drugA, drugB, cohort_limit, expand_gr
   
   # Filter data up to the specified cohort
   filtered_data <- data %>% 
-    dplyr::filter(cohort <= cohort_limit)
+    dplyr::filter(.data$cohort <= cohort_limit)
   
   # Calculate cumulative DLT proportion for each dose combination level
   cumulative_dlt_data <- filtered_data %>%
-    dplyr::arrange(cohort) %>%
-    dplyr::group_by(doseCombination) %>%
+    dplyr::arrange(.data$cohort) %>%
+    dplyr::group_by(.data$doseCombination) %>%
     dplyr::summarise(
       cumulative_count = dplyr::n(),
-      cumulative_DLT = sum(outcome),
-      cumulative_DLT_proportion = cumulative_DLT / cumulative_count
+      cumulative_DLT = sum(.data$outcome),
+      cumulative_DLT_proportion = .data$cumulative_DLT / .data$cumulative_count
     ) %>%
     dplyr::ungroup() 
   
   # Convert doseCombination to separate dose levels
   cumulative_dlt_data <- cumulative_dlt_data %>%
-    tidyr::separate(doseCombination, into = c("Drug1", "Drug2"), sep = "\\.") %>%
+    tidyr::separate(.data$doseCombination, into = c("Drug1", "Drug2"), sep = "\\.") %>%
     dplyr::mutate(
-      Drug1 = factor(Drug1, levels = names(drugA$getDoseLevels())),
-      Drug2 = factor(Drug2, levels = names(drugB$getDoseLevels()))
+      Drug1 = factor(.data$Drug1, levels = names(drugA$getDoseLevels())),
+      Drug2 = factor(.data$Drug2, levels = names(drugB$getDoseLevels()))
     )
   
   if (expand_grid) {
@@ -121,7 +123,7 @@ plot_dlt_proportion <- function(sim_output, drugA, drugB, cohort_seq) {
   p <- ggplot2::ggplot() +
     ggplot2::geom_tile(
       data = cumulative_dlt_df, 
-      ggplot2::aes(x = Drug1, y = Drug2, fill = cumulative_DLT_proportion), 
+      ggplot2::aes(x = .data$Drug1, y = .data$Drug2, fill = .data$cumulative_DLT_proportion), 
       alpha = 0.5, 
       size = 2
     ) +
@@ -136,7 +138,7 @@ plot_dlt_proportion <- function(sim_output, drugA, drugB, cohort_seq) {
       drop = FALSE
     ) +
     ggplot2::geom_step(
-      ggplot2::aes(x = x, y = y), 
+      ggplot2::aes(x = .data$x, y = .data$y), 
       data = step_data, 
       linewidth = 1.5, 
       color = "black", 
@@ -149,11 +151,11 @@ plot_dlt_proportion <- function(sim_output, drugA, drugB, cohort_seq) {
       name = "DLT Proportion"
     ) +
     ggplot2::geom_text(
-      data = cumulative_dlt_df %>% dplyr::filter(!is.na(cumulative_DLT_proportion)), 
+      data = cumulative_dlt_df %>% dplyr::filter(!is.na(.data$cumulative_DLT_proportion)), 
       ggplot2::aes(
-        x = as.numeric(Drug1), 
-        y = as.numeric(Drug2), 
-        label = paste(cumulative_count, "(", cumulative_DLT, ")", sep = "")
+        x = as.numeric(.data$Drug1), 
+        y = as.numeric(.data$Drug2), 
+        label = paste(.data$cumulative_count, "(", .data$cumulative_DLT, ")", sep = "")
       ), 
       color = "black"
     ) +
