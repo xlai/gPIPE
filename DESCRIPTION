@@ -4,15 +4,14 @@ Version: 0.1.0.9000
 Authors@R: 
     person("Xiaoran", "Lai", , "research@xlai.org", role = c("aut", "cre", "cph"),
            comment = c(ORCID = "0000-0002-7364-3993"))
-Description: Implements a generalized Product of Independent Beta Probabilities Escalation (PIPE) 
-    design incorporating epsilon-tapering for dual-agent dose-finding studies. The package builds on 
-    two key methodological frameworks: the PIPE approach for dual-agent trials by Mander and 
-    Sweeting (2015) <doi:10.1002/sim.6434> "A product of independent beta probabilities dose 
-    escalation design for dual-agent phase I trials", and Cheung et al.'s (2022) 
-    <doi:10.1214/21-aoas1603> "A novel framework to estimate multidimensional minimum effective doses 
-    using asymmetric posterior gain and epsilon-tapering". The implementation features flexible admissibility 
-    rules, multiple dose selection strategies, and robust simulation tools for design calibration, 
-    evaluation, and comparison with existing dose-finding methodologies.
+Description: Implements the Product of Independent beta Probabilities
+    Escalation (PIPE) design for drug-combination dose-finding trials, for any
+    number of drugs. It covers the original PIPE design for the maximum
+    tolerated dose contour of Mander and Sweeting (2015) <doi:10.1002/sim.6434>
+    and PIPE with epsilon-tapering for the minimum effective dose of Cheung,
+    Chandereng and Diaz (2022) <doi:10.1214/21-aoas1603>. Estimates use exact
+    solvers (enumeration of monotone dose sets, or a minimum cut), and whole
+    trials can be simulated to give operating characteristics.
 License: GPL (>= 3)
 Depends:
     R (>= 4.4)
@@ -31,6 +30,7 @@ Config/testthat/edition: 3
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 Collate:
+    'gPIPE-package.R'
     'grid.R'
     'coding.R'
     'solvers.R'
