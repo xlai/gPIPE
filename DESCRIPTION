@@ -37,6 +37,7 @@ Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 Collate:
     'grid.R'
+    'coding.R'
     'DrugCombiConstructor.R'
     'TrialConstructor.R'
     'DoseConfigurator.R'
