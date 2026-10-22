@@ -1,16 +1,24 @@
 # Workflow derived from https://github.com/r-lib/actions/tree/v2/examples
 # Need help debugging build failures? Start at https://github.com/r-lib/actions#where-to-find-help
 #
-# NOTE: This workflow is overkill for most R packages and
-# check-standard.yaml is likely a better choice.
-# usethis::use_github_action("check-standard") will install it.
+# gPIPE requires R >= 4.4. R-devel runs as an early warning and does not block.
 on:
   push:
-    branches: [main, master]
+    branches: [main, dev]
   pull_request:
-    branches: [main, master]
+    branches: [main, dev]
+  schedule:
+    # weekly, Monday 06:00 UTC, so changes in R-devel surface early
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
 
 name: R-CMD-check
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: read-all
 
 jobs:
   R-CMD-check:
@@ -18,31 +26,24 @@ jobs:
 
     name: ${{ matrix.config.os }} (${{ matrix.config.r }})
 
+    continue-on-error: ${{ matrix.config.experimental }}
+
     strategy:
       fail-fast: false
       matrix:
         config:
-          - {os: macos-latest,   r: 'release'}
-
-          - {os: windows-latest, r: 'release'}
-          # Use 3.6 to trigger usage of RTools35
-          - {os: windows-latest, r: '3.6'}
-          # use 4.1 to check with rtools40's older compiler
-          - {os: windows-latest, r: '4.1'}
-
-          - {os: ubuntu-latest,   r: 'devel', http-user-agent: 'release'}
-          - {os: ubuntu-latest,   r: 'release'}
-          - {os: ubuntu-latest,   r: 'oldrel-1'}
-          - {os: ubuntu-latest,   r: 'oldrel-2'}
-          - {os: ubuntu-latest,   r: 'oldrel-3'}
-          - {os: ubuntu-latest,   r: 'oldrel-4'}
+          - {os: macos-latest,   r: 'release', experimental: false}
+          - {os: windows-latest, r: 'release', experimental: false}
+          - {os: ubuntu-latest,  r: 'devel',   experimental: true, http-user-agent: 'release'}
+          - {os: ubuntu-latest,  r: 'release', experimental: false}
+          - {os: ubuntu-latest,  r: 'oldrel-1', experimental: false}
 
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       R_KEEP_PKG_SOURCE: yes
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: r-lib/actions/setup-pandoc@v2
 
@@ -60,3 +61,4 @@ jobs:
       - uses: r-lib/actions/check-r-package@v2
         with:
           upload-snapshots: true
+          build_args: 'c("--no-manual","--compact-vignettes=gs+qpdf")'
