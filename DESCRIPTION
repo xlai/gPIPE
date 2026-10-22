@@ -26,6 +26,7 @@ Imports:
     stats,
     utils
 Suggests: 
+    jsonlite,
     testthat (>= 3.0.0),
     bookdown,
     knitr,
