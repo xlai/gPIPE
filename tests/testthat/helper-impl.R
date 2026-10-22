@@ -27,10 +27,18 @@ reference_impl <- function() {
 
 gpipe_impl <- function() {
   list(
-    enumerate = function(levels) {
-      if (length(levels) != 2) return(NULL)
-      mats <- monotonic_matrices(levels[1], levels[2], "increasing")
-      t(vapply(mats, function(m) as.integer(c(m)), integer(prod(levels))))
+    enumerate = function(levels) grid_upsets(DoseGrid(levels = levels)),
+    estimate = function(levels, p, n, eps, weights = c("1", "n+1"), target = c("MTD", "MED")) {
+      target <- match.arg(target)
+      w <- pipe_weights(n, match.arg(weights))
+      pipe_estimate(DoseGrid(levels = levels), pipe_gain(p, eps, w, target), target)
+    },
+    cheung_candidates = function(levels, gamma) cheung_candidates(DoseGrid(levels = levels), gamma),
+    ms_state = function(spec) {
+      p <- beta_exceedance(spec$theta, spec$a, spec$b, spec$n, spec$r)
+      ms_decide(DoseGrid(levels = spec$levels), p, spec$n, S = spec$a + spec$b + spec$n,
+                history = spec$history, admis = spec$admis, safety = spec$safety,
+                final = isTRUE(spec$final))
     }
   )
 }
