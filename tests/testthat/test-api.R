@@ -26,7 +26,7 @@ test_that("convenience constructors set up the two designs", {
 
 test_that("trial data become sufficient statistics", {
   dat <- data.frame(A = c(1, 1, 2), B = c(1, 1, 3), y = c(0, 1, 2))
-  x <- design_data(PipeDesign(grid = g33, theta = 0.3, N = 20), dat)
+  x <- design_data(PipeDesign(grid = g33, theta = 0.3, N = 20, outcome = "normal"), dat)
   k <- combo_index(g33, rbind(c(1, 1), c(2, 3)))
   expect_equal(x$n[k], c(2, 1))
   expect_equal(x$s1[k], c(1, 2))
@@ -35,6 +35,18 @@ test_that("trial data become sufficient statistics", {
   des <- PipeDesign(grid = g33, theta = 0.3, N = 20)
   expect_error(design_data(des, data.frame(A = 1, y = 0)), "columns A, B")
   expect_error(design_data(des, data.frame(A = 4, B = 1, y = 0)), "not in the grid")
+  expect_error(design_data(des, data.frame(A = 1.5, B = 1, y = 0)), "whole numbers")
+  expect_error(design_data(des, data.frame(A = 1, B = 1, y = 2)), "0 or 1")
+  expect_error(design_data(des, data.frame(A = 1, B = 1, y = NA)), "missing")
+})
+
+test_that("an unnamed grid uses the default drug names A, B", {
+  g <- DoseGrid(levels = c(3, 3))
+  des <- ms_design(g, theta = 0.3, prior_median = 0.3, prior_strength = 1 / 9, N = 30)
+  dat <- data.frame(A = c(1, 1), B = c(1, 1), y = c(0, 0))
+  expect_true(S7::S7_inherits(estimate(des, dat), PipeEstimate))
+  expect_true(next_dose(des, dat)$dose %in% seq_len(9))
+  expect_error(estimate(des, data.frame(x = 1, y = 0)), "columns A, B and `y`")
 })
 
 test_that("estimate and next_dose agree with the trial loop", {

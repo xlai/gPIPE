@@ -155,7 +155,17 @@ design_data <- function(design, data) {
   if (!all(c(drugs, "y") %in% names(data))) {
     stop(sprintf("`data` needs columns %s and `y`.", paste(drugs, collapse = ", ")), call. = FALSE)
   }
-  k <- combo_index(grid, as.matrix(data[drugs]))
+  levels <- as.matrix(data[drugs])
+  if (!is.numeric(levels) || anyNA(levels) || any(levels != round(levels))) {
+    stop("Dose levels in `data` must be whole numbers.", call. = FALSE)
+  }
+  if (!is.numeric(data$y) || anyNA(data$y)) {
+    stop("`y` must be numeric with no missing values.", call. = FALSE)
+  }
+  if (design@outcome == "binary" && !all(data$y %in% c(0, 1))) {
+    stop("`y` must be 0 or 1 for a binary outcome.", call. = FALSE)
+  }
+  k <- combo_index(grid, levels)
   if (anyNA(k)) {
     stop("`data` has dose combinations that are not in the grid.", call. = FALSE)
   }
