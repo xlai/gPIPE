@@ -20,7 +20,7 @@ for all.}
 \item{sigma0}{Known outcome SD used before the variance can be estimated.}
 
 \item{rule}{\code{"cheung"} (epsilon-tapering, sampling from S1 u S0) or \code{"ms"}
-(Mander & Sweeting: admissible set, safety rule, RPII).}
+(Mander & Sweeting: admissible set, safety rule, RP2D).}
 
 \item{eps, taper}{Asymmetry of the gain and whether it tapers from 0.5 to
 \code{eps} over the trial (\code{"cheung"} only; \code{"ms"} uses 0.5).}

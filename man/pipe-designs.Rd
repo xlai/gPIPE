@@ -11,31 +11,11 @@ ms_design(
   theta,
   prior_median,
   prior_strength,
-  N,
-  cohort = 1,
-  admis = "closest",
-  selection = "min_S",
-  constraint = "neighbouring",
-  safety = 0.8,
   prior_method = "bisection",
   ...
 )
 
-cheung_design(
-  grid,
-  theta,
-  eps,
-  N,
-  target = "MED",
-  outcome = "normal",
-  sigma0 = 1,
-  prior_a = 1,
-  prior_b = 1,
-  taper = TRUE,
-  selection = "equal",
-  cohort = 1,
-  ...
-)
+cheung_design(grid, theta, eps, target = "MED", outcome = "normal", ...)
 }
 \arguments{
 \item{grid}{A \link{DoseGrid}.}
@@ -46,34 +26,17 @@ cheung_design(
 toxicity probability and prior strength a + b (one per combination or one
 for all). M&S call strength 1 "strong" and 1 / K "weak".}
 
-\item{N, cohort}{Maximum number of patients and cohort size.}
-
-\item{admis, constraint, safety}{M&S options: \code{"closest"} or \code{"adjacent"};
-\code{"neighbouring"} or \code{"non-neighbouring"}; the safety threshold, or \code{NULL}
-for no safety rule.}
-
-\item{selection}{How the next dose is drawn: \code{"equal"} or \code{"prob"} for
-\code{"cheung"}; \code{"min_S"}, \code{"inverse_S"}, \code{"equal"} or \code{"inverse_sqrt_S"}
-for \code{"ms"}. \code{NULL} for the rule's default.}
-
 \item{prior_method}{\code{"bisection"} reproduces pipe.design; \code{"exact"} solves
 the median exactly.}
 
-\item{...}{Other \link{PipeDesign} properties.}
-
-\item{eps, taper}{Asymmetry of the gain and whether it tapers from 0.5 to
-\code{eps} over the trial (\code{"cheung"} only; \code{"ms"} uses 0.5).}
+\item{...}{Other \link{PipeDesign} properties, such as \code{N} (required), \code{cohort},
+\code{selection} or \code{sigma0}. Their defaults are those of \link{PipeDesign}.}
 
 \item{target}{\code{"MTD"} or \code{"MED"}.}
 
 \item{outcome}{\code{"binary"} (Beta priors \code{prior_a}, \code{prior_b}) or
 \code{"normal"} (pooled-variance t posterior, with \code{sigma0} while there is no
 variance estimate).}
-
-\item{sigma0}{Known outcome SD used before the variance can be estimated.}
-
-\item{prior_a, prior_b}{Beta prior parameters, one per combination or one
-for all.}
 }
 \value{
 A \link{PipeDesign}.

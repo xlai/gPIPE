@@ -11,7 +11,7 @@ expect_ms_state <- function(got, expected, id) {
   expect_equal(got$q, expected$q, tolerance = 1e-8, info = paste(id, "q"))
   sets <- c("safe", "neighbourhood", "admissible")
   if (!expected$stopped) sets <- c(sets, "dominant", "candidates", "min_S")
-  if (!is.null(expected$rpII)) sets <- c(sets, "rpII")
+  if (!is.null(expected$rp2d)) sets <- c(sets, "rp2d")
   for (field in sets) {
     expect_equal(sort(as.numeric(got[[field]])), expected[[field]], info = paste(id, field))
   }

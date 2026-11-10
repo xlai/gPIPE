@@ -86,7 +86,7 @@ test_that("M&S stops when no dose in the neighbourhood is safe", {
   out <- ms_decide(g, p, n, S = n + 1, history = c(1L, 5L, 9L), final = TRUE)
   expect_true(1L %in% out$safe)
   expect_true(out$stopped)
-  expect_equal(out$rpII, integer())
+  expect_equal(out$rp2d, integer())
   expect_null(out$candidates)
 })
 
@@ -99,7 +99,7 @@ test_that("M&S decision without the safety rule uses the estimate only", {
   expect_equal(out$mode, pipe_estimate(g, stats::qlogis(p), "MTD"))
   expect_true(all(out$candidates %in% out$neighbourhood))
   expect_equal(sum(out$prob), 1)
-  expect_true(all(n[out$rpII] > 0 & out$mode[out$rpII] == 0))
+  expect_true(all(n[out$rp2d] > 0 & out$mode[out$rp2d] == 0))
 })
 
 test_that("M&S decision with the safety rule works for three drugs", {
@@ -145,14 +145,14 @@ test_that("M&S decisions keep their set relations under every option", {
           expect_equal(out$admissible, intersect(out$neighbourhood, out$safe), info = info)
           expect_equal(out$stopped, !length(out$admissible), info = info)
           if (out$stopped) {
-            expect_equal(out$rpII, integer(), info = info)
+            expect_equal(out$rp2d, integer(), info = info)
           } else {
             expect_true(length(out$candidates) > 0, info = info)
             expect_true(all(out$candidates %in% out$admissible), info = info)
             expect_equal(sum(out$prob), 1, info = info)
             expect_true(all(which(out$prob > 0) %in% out$candidates), info = info)
-            expect_true(all(out$mode[out$rpII] == 0 & n[out$rpII] > 0 &
-                              out$rpII %in% out$safe), info = info)
+            expect_true(all(out$mode[out$rp2d] == 0 & n[out$rp2d] > 0 &
+                              out$rp2d %in% out$safe), info = info)
           }
         }
       }

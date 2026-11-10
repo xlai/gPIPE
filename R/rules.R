@@ -7,7 +7,7 @@
 # - Cheung et al. (2022), epsilon-tapering: the sampling set S1 u S0;
 # - Mander & Sweeting (2015), original PIPE: admissible set (constraint and
 #   safety), closest or adjacent dominant doses, dose choice by sample size,
-#   and the recommended phase II doses (RPII), as pipe.design 0.5.1 runs them.
+#   and the recommended phase II doses (RP2D), as pipe.design 0.5.1 runs them.
 
 # ---- Cheung (2022) ----------------------------------------------------------
 
@@ -140,9 +140,9 @@ ms_selection_weights <- function(candidates, S,
 # (every realistic grid of two or three drugs).
 #
 # Returns p, the mode contour, q, the safe, constraint and admissible sets,
-# and whether the trial stops (no admissible dose; pipe.design gives no RPII
+# and whether the trial stops (no admissible dose; pipe.design gives no RP2D
 # then). Unless stopped: the dominant and candidate doses, the min-S ties and
-# the dose-choice weights for `selection`. With final = TRUE, the RPII:
+# the dose-choice weights for `selection`. With final = TRUE, the RP2D:
 # closest doses over the whole grid that are safe, tried and pass the safety
 # rule.
 ms_decide <- function(grid, p, n, S, history, admis = c("closest", "adjacent"),
@@ -184,7 +184,7 @@ ms_decide <- function(grid, p, n, S, history, admis = c("closest", "adjacent"),
     out$prob <- ms_selection_weights(cand, S, selection)
   }
   if (final) {
-    out$rpII <- if (out$stopped) {
+    out$rp2d <- if (out$stopped) {
       integer()
     } else {
       closest <- ms_closest(grid, gamma, rep(TRUE, K))

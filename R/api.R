@@ -19,7 +19,7 @@
 #'   for all.
 #' @param sigma0 Known outcome SD used before the variance can be estimated.
 #' @param rule `"cheung"` (epsilon-tapering, sampling from S1 u S0) or `"ms"`
-#'   (Mander & Sweeting: admissible set, safety rule, RPII).
+#'   (Mander & Sweeting: admissible set, safety rule, RP2D).
 #' @param eps,taper Asymmetry of the gain and whether it tapers from 0.5 to
 #'   `eps` over the trial (`"cheung"` only; `"ms"` uses 0.5).
 #' @param weights `"n+1"` or `"1"`; `NULL` for the rule's default.
@@ -73,31 +73,26 @@ PipeDesign := new_class(
   }
 )
 
-# The plain list the trial loop runs on, built once from the S7 object.
+# The plain list the trial loop runs on, built once from the S7 object: the
+# properties go to `pipe_trial_design()`, which checks them.
 design_list <- function(design) {
-  K <- n_combos(design@grid)
-  outcome <- match.arg(design@outcome, c("binary", "normal"))
-  if (length(design@theta) != 1L) {
-    stop("`theta` must be a single number.", call. = FALSE)
+  p <- S7::props(design)
+  outcome <- match.arg(p$outcome, c("binary", "normal"))
+  for (nm in c("theta", "N")) {
+    if (length(p[[nm]]) != 1L) stop(sprintf("`%s` must be a single number.", nm), call. = FALSE)
   }
-  model <- if (outcome == "binary") {
-    for (prior in list(design@prior_a, design@prior_b)) {
-      if (!length(prior) %in% c(1L, K) || any(prior <= 0)) {
+  p$model <- if (outcome == "binary") {
+    for (prior in list(p$prior_a, p$prior_b)) {
+      if (!length(prior) %in% c(1L, n_combos(p$grid)) || any(prior <= 0)) {
         stop("Beta priors must be positive, one per combination or one for all.", call. = FALSE)
       }
     }
-    outcome_beta(design@theta, design@prior_a, design@prior_b)
+    outcome_beta(p$theta, p$prior_a, p$prior_b)
   } else {
-    outcome_normal(design@theta, design@sigma0)
+    outcome_normal(p$theta, p$sigma0)
   }
-  safety <- if (design@rule == "ms") design@safety else NULL
-  pipe_trial_design(
-    grid = design@grid, model = model, target = design@target, N = design@N,
-    cohort = design@cohort, start = design@start, rule = design@rule, eps = design@eps,
-    taper = design@taper, weights = design@weights, selection = design@selection,
-    admis = design@admis, constraint = design@constraint, safety = safety,
-    delta = design@delta, within_set = design@within_set
-  )
+  if (p$rule != "ms") p["safety"] <- list(NULL)
+  do.call(pipe_trial_design, p[intersect(names(p), names(formals(pipe_trial_design)))])
 }
 
 #' Convenience constructors for the two PIPE designs
@@ -113,7 +108,8 @@ design_list <- function(design) {
 #'   for all). M&S call strength 1 "strong" and 1 / K "weak".
 #' @param prior_method `"bisection"` reproduces pipe.design; `"exact"` solves
 #'   the median exactly.
-#' @param ... Other [PipeDesign] properties.
+#' @param ... Other [PipeDesign] properties, such as `N` (required), `cohort`,
+#'   `selection` or `sigma0`. Their defaults are those of [PipeDesign].
 #' @return A [PipeDesign].
 #' @examples
 #' g <- DoseGrid(levels = c(A = 4, B = 4))
@@ -121,25 +117,18 @@ design_list <- function(design) {
 #' cheung_design(g, theta = 0.5, sigma0 = 1, eps = 0.05, N = 60)
 #' @name pipe-designs
 #' @export
-ms_design <- function(grid, theta, prior_median, prior_strength, N, cohort = 1,
-                      admis = "closest", selection = "min_S", constraint = "neighbouring",
-                      safety = 0.8, prior_method = "bisection", ...) {
+ms_design <- function(grid, theta, prior_median, prior_strength, prior_method = "bisection", ...) {
   pr <- beta_prior_from_median(rep_len(c(prior_median), n_combos(grid)), prior_strength,
                                method = prior_method)
-  PipeDesign(grid = grid, target = "MTD", theta = theta, outcome = "binary",
-             prior_a = pr$a, prior_b = pr$b, rule = "ms", N = N, cohort = cohort,
-             admis = admis, selection = selection, constraint = constraint, safety = safety,
-             ...)
+  PipeDesign(grid = grid, theta = theta, prior_a = pr$a, prior_b = pr$b,
+             target = "MTD", outcome = "binary", rule = "ms", ...)
 }
 
 #' @rdname pipe-designs
 #' @export
-cheung_design <- function(grid, theta, eps, N, target = "MED", outcome = "normal",
-                          sigma0 = 1, prior_a = 1, prior_b = 1, taper = TRUE,
-                          selection = "equal", cohort = 1, ...) {
-  PipeDesign(grid = grid, target = target, theta = theta, outcome = outcome, sigma0 = sigma0,
-             prior_a = prior_a, prior_b = prior_b, rule = "cheung", eps = eps, taper = taper,
-             selection = selection, N = N, cohort = cohort, safety = NULL, ...)
+cheung_design <- function(grid, theta, eps, target = "MED", outcome = "normal", ...) {
+  PipeDesign(grid = grid, theta = theta, eps = eps, target = target, outcome = outcome,
+             rule = "cheung", ...)
 }
 
 # Trial data as sufficient statistics. `data` is a data frame with one row

@@ -37,7 +37,7 @@ read_pipe_design_states <- function(setting) {
         expected$next_dose <- json_doses(list(y$next_dose_observed), I)
       }
     }
-    if (x$final) expected$rpII <- doses(y$rpII)
+    if (x$final) expected$rp2d <- doses(y$rpII)
     list(
       id = x$id,
       spec = list(

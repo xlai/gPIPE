@@ -14,7 +14,7 @@
 #   The final estimate uses eps.
 # - "ms": Mander & Sweeting (2015) as pipe.design 0.5.1 runs it, through
 #   ms_decide(). The trial stops early only through the safety rule, and then
-#   gives no RPII.
+#   gives no RP2D.
 
 # Design as a plain list, with defaults filled in and checked.
 #   grid, model:   a DoseGrid and an outcome model (outcome_beta(), ...);
@@ -83,7 +83,7 @@ pipe_trial_design <- function(grid, model, target = c("MTD", "MED"), N, cohort =
 #   stopped:        TRUE when the trial stopped before N (M&S safety rule);
 #   gamma:          the final PIPE estimate (gamma = 1: exceeds theta);
 #   final_set:      maximal safe doses (MTD) or minimal effective doses (MED)
-#                   for "cheung", the RPII for "ms" (empty when stopped);
+#                   for "cheung", the RP2D for "ms" (empty when stopped);
 #   pick:           single dose by Riviere's rule (binary MTD only, else NA).
 pipe_trial <- function(design, truth) {
   model <- design$model
@@ -138,7 +138,7 @@ trial_step <- function(design, n, s1, s2, history) {
 }
 
 # Final estimate after the data so far: p, gamma (with eps itself), the final
-# set (MTD/MED set for "cheung", RPII for "ms", empty when stopped), Riviere's
+# set (MTD/MED set for "cheung", RP2D for "ms", empty when stopped), Riviere's
 # pick (binary MTD only, else NA) and, for "ms", q.
 trial_final <- function(design, n, s1, s2, history, stopped = FALSE) {
   grid <- design$grid
@@ -154,7 +154,7 @@ trial_final <- function(design, n, s1, s2, history, stopped = FALSE) {
                      safety = design$safety, start = design$start, final = TRUE)
     gamma <- dec$mode
     q <- dec$q
-    final_set <- if (stopped || dec$stopped) integer() else dec$rpII
+    final_set <- if (stopped || dec$stopped) integer() else dec$rp2d
   }
   pick <- NA_integer_
   if (model$family == "binary" && design$target == "MTD" && length(final_set)) {
