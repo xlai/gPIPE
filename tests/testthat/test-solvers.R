@@ -107,6 +107,7 @@ test_that("pipe_estimate uses the same solver for any number of drugs", {
   }
   expect_error(pipe_estimate(DoseGrid(levels = c(5, 5)), stats::rnorm(8)),
                "one entry per combination")
+  expect_error(pipe_estimate(DoseGrid(levels = c(2, 2)), c(1, NA, 0, 1)), "missing")
   # a grid far too large to list its up-sets
   g <- DoseGrid(levels = c(10, 10))
   expect_true(is_upset(g, pipe_estimate(g, stats::rnorm(100))))
@@ -133,6 +134,8 @@ test_that("upset_exceedance handles certain doses and checks its input", {
   C <- oracle_upsets(g)
   expect_equal(upset_exceedance(g, rep(0.5, 6)), colMeans(C))
   expect_error(upset_exceedance(g, rep(0.5, 5)), "one entry per combination")
+  expect_error(upset_exceedance(g, c(0.5, NA, 0.5, 0.5, 0.5, 0.5)), "probabilities")
+  expect_error(upset_exceedance(g, c(0.5, 1.2, 0.5, 0.5, 0.5, 0.5)), "probabilities")
 })
 
 test_that("the sweep needs few states and stops above its limit", {
@@ -161,4 +164,104 @@ test_that("min-cut and the sweep reproduce the pipe.design snapshots", {
       expect_equal(which(q < sp$safety), s$expected$safe, info = s$id)
     }
   }
+})
+
+test_that("subset grids agree with an oracle that does not use the cover edges", {
+  # Up-sets straight from the definition: x in U and y >= x in every drug
+  # imply y in U. All 2^K subsets are tried, so this does not rely on
+  # grid@edges, which the solvers and oracle_upsets() both read.
+  definition_upsets <- function(grid) {
+    X <- grid@combos
+    K <- nrow(X)
+    above <- outer(seq_len(K), seq_len(K), Vectorize(function(i, j) all(X[j, ] >= X[i, ])))
+    sets <- as.matrix(expand.grid(rep(list(0:1), K)))
+    ok <- apply(sets, 1, function(u) all(u[col(above)[above]] >= u[row(above)[above]]))
+    unname(sets[ok, , drop = FALSE])
+  }
+  keep2 <- matrix(TRUE, 3, 3)
+  keep2[2, 2] <- FALSE
+  keep3 <- array(TRUE, c(2, 2, 3))
+  keep3[1, 2, 2] <- FALSE
+  keep3[2, 1, 1] <- FALSE
+  set.seed(24)
+  for (g in list(DoseGrid(levels = c(3, 3), keep = keep2), DoseGrid(levels = c(2, 2, 3), keep = keep3))) {
+    C <- definition_upsets(g)
+    expect_equal(nrow(C), nrow(oracle_upsets(g)))
+    K <- n_combos(g)
+    for (rep in 1:20) {
+      d <- if (rep %% 2) stats::rnorm(K) else sample(-2:2, K, replace = TRUE)
+      p <- stats::runif(K)
+      expect_equal(solve_mincut(g, d, TRUE), oracle_solve(C, d, TRUE))
+      expect_equal(solve_mincut(g, d, FALSE), oracle_solve(C, d, FALSE))
+      expect_equal(upset_exceedance(g, p), oracle_exceedance(C, p), tolerance = 1e-12)
+    }
+  }
+})
+
+test_that("the smallest grids work", {
+  for (levels in list(1, c(1, 1), c(1, 1, 1), c(1, 4), c(3, 1, 1))) {
+    g <- DoseGrid(levels = levels)
+    K <- n_combos(g)
+    C <- oracle_upsets(g)
+    p <- seq(0.2, 0.7, length.out = K)
+    expect_equal(upset_exceedance(g, p), oracle_exceedance(C, p), tolerance = 1e-12)
+    d <- stats::qlogis(p)
+    expect_equal(pipe_estimate(g, d), oracle_solve(C, d, TRUE))
+    expect_equal(pipe_estimate(g, d, "MED"), oracle_solve(C, d, FALSE))
+  }
+  # one combination: q is p itself
+  expect_equal(upset_exceedance(DoseGrid(levels = 1), 0.3), 0.3)
+})
+
+test_that("the sweep does not underflow when p is 0 or 1", {
+  # One drug, 60 levels: surely toxic at the 30 lowest doses, surely safe at
+  # the 30 highest. The 61 up-sets are the top s doses, s = 0..60. A sweep
+  # that drops states far below the best one returns q = 0 or 1 here.
+  g <- DoseGrid(levels = 60)
+  p <- rep(c(1, 0), each = 30)
+  C <- 1L * outer(0:60, 1:60, function(s, k) k > 60 - s)
+  score <- drop(C %*% stats::qlogis(pmin(pmax(p, 1e-12), 1 - 1e-12)))
+  w <- exp(score - max(score))
+  expect_equal(upset_exceedance(g, p), drop(crossprod(C, w / sum(w))), tolerance = 1e-10)
+  # the same contradiction on three drugs
+  g3 <- DoseGrid(levels = c(3, 3, 3))
+  C3 <- oracle_upsets(g3)
+  for (p3 in list(as.numeric(rowSums(g3@combos) <= 5), rep(c(1, 0), length.out = 27))) {
+    score <- drop(C3 %*% stats::qlogis(pmin(pmax(p3, 1e-12), 1 - 1e-12)))
+    w <- exp(score - max(score))
+    expect_equal(upset_exceedance(g3, p3), drop(crossprod(C3, w / sum(w))), tolerance = 1e-10)
+  }
+  expect_equal(unname(log_sum_exp_by(c(0, -2000, -2000, -Inf, -Inf), c(1, 2, 2, 3, 3))),
+               c(0, -2000 + log(2), -Inf))
+})
+
+test_that("the tie tolerance follows the largest gain, not the total", {
+  # 40 doses of one drug. Adding the lowest dose costs 1e-7, a real loss next
+  # to gains of 100, so it stays out even though the gains sum to 3900.
+  g <- DoseGrid(levels = 40)
+  gamma <- solve_mincut(g, c(-1e-7, rep(100, 39)), largest = TRUE)
+  expect_equal(gamma, c(0L, rep(1L, 39)))
+  # weights n + 1 on a larger grid, against brute force
+  g2 <- DoseGrid(levels = c(5, 5))
+  C <- oracle_upsets(g2)
+  set.seed(51)
+  for (rep in 1:20) {
+    n <- sample(0:30, 25, replace = TRUE)
+    d <- pipe_gain(stats::runif(25), 0.3, n + 1, "MTD")
+    expect_equal(solve_mincut(g2, d, TRUE), oracle_solve(C, d, TRUE))
+  }
+})
+
+test_that("sweep plans are cached per grid and respect a lower state limit", {
+  full <- DoseGrid(levels = c(3, 3, 2))
+  keep <- array(TRUE, c(3, 3, 2))
+  keep[2, 2, 1] <- FALSE
+  part <- DoseGrid(levels = c(3, 3, 2), keep = keep)
+  # same levels, different combinations: different plans
+  expect_length(upset_sweep_plan(full)$steps, 18)
+  expect_length(upset_sweep_plan(part)$steps, 17)
+  expect_identical(upset_sweep_plan(full), upset_sweep_plan(full))
+  # a cached plan above a new, lower limit is refused
+  expect_error(upset_sweep_plan(full, max_states = 5), "max_states")
+  expect_length(upset_sweep_plan(full)$steps, 18)
 })

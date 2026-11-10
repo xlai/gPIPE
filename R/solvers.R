@@ -23,7 +23,9 @@
 # upwards. After a max flow (Edmonds-Karp), the nodes reachable from s in the
 # residual graph form the smallest optimal U, and the nodes that cannot reach
 # t form the largest one. A residual capacity counts only when it exceeds
-# tol = 1e-10 (1 + sum |d|).
+# tol = 1e-10 (1 + max |d|). The tolerance follows the largest single gain,
+# not the total, so that weights n + 1 on a large grid do not turn small real
+# gains into ties.
 solve_mincut <- function(grid, d, largest = TRUE) {
   K <- n_combos(grid)
   s <- K + 1L
@@ -33,7 +35,7 @@ solve_mincut <- function(grid, d, largest = TRUE) {
   from <- c(rep(s, length(pos)), neg, grid@edges[, "lower"])
   to <- c(pos, rep(t, length(neg)), grid@edges[, "upper"])
   cap <- c(d[pos], -d[neg], rep(Inf, nrow(grid@edges)))
-  tol <- 1e-10 * (1 + sum(abs(d)))
+  tol <- 1e-10 * (1 + max(abs(d)))
 
   # Edge i and its reverse are stored at 2i - 1 and 2i.
   m <- length(from)
@@ -109,6 +111,9 @@ pipe_estimate <- function(grid, d, target = c("MTD", "MED")) {
   if (length(d) != n_combos(grid)) {
     stop("`d` must have one entry per combination.", call. = FALSE)
   }
+  if (anyNA(d)) {
+    stop("`d` must not have missing values.", call. = FALSE)
+  }
   solve_mincut(grid, d, largest = target == "MTD")
 }
 
@@ -135,6 +140,10 @@ upset_sweep_plan <- function(grid, max_states = 1e5) {
   }
   e <- grid@edges
   K <- n_combos(grid)
+  if (any(e[, "lower"] >= e[, "upper"])) {
+    stop("The sweep needs every lower cover to come before its upper cover in the list.",
+         call. = FALSE)
+  }
   # last_use[k]: the last upper cover of k in list order (0 when it has none)
   last_use <- integer(K)
   if (nrow(e)) {
@@ -191,6 +200,9 @@ upset_exceedance <- function(grid, p, max_states = 1e5) {
   if (length(p) != K) {
     stop("`p` must have one entry per combination.", call. = FALSE)
   }
+  if (anyNA(p) || any(p < 0 | p > 1)) {
+    stop("`p` must be probabilities, with no missing values.", call. = FALSE)
+  }
   steps <- upset_sweep_plan(grid, max_states)$steps
   logit <- stats::qlogis(pmin(pmax(p, 1e-12), 1 - 1e-12))
   alpha <- vector("list", K + 1L)
@@ -214,7 +226,19 @@ upset_exceedance <- function(grid, p, max_states = 1e5) {
 }
 
 # log(sum(exp(x))) within each group; groups are 1, 2, ... and all occur.
+# All groups are shifted by the overall maximum first. A group more than 700
+# below it would underflow (exp(-745) is 0), and such a group can become the
+# largest again later in the sweep when p is close to 0 or 1. Those groups are
+# redone with their own maximum. A group of -Inf only stays -Inf.
 log_sum_exp_by <- function(x, group) {
   top <- max(x)
-  log(drop(rowsum(exp(x - top), group))) + top
+  out <- log(drop(rowsum(exp(x - top), group))) + top
+  redo <- (out < top - 700)[group] & x > -Inf
+  if (any(redo)) {
+    g <- group[redo]
+    own <- tapply(x[redo], g, max)
+    part <- log(drop(rowsum(exp(x[redo] - own[as.character(g)]), g))) + own
+    out[as.integer(names(own))] <- part
+  }
+  out
 }
