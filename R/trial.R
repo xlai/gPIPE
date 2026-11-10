@@ -47,6 +47,11 @@ pipe_trial_design <- function(grid, model, target = c("MTD", "MED"), N, cohort =
     stop("The M&S rule uses eps = 0.5 and weights = \"1\"; it cannot take other values.",
          call. = FALSE)
   }
+  if (rule == "ms" && !is.null(safety)) {
+    # Build the sweep plan now, so a grid too wide for the safety rule fails
+    # here and not in the middle of a trial.
+    upset_sweep_plan(grid)
+  }
   if (is.null(start)) {
     K <- n_combos(grid)
     start <- if (rule == "cheung" && target == "MED") max(maximal_elements(grid, rep(TRUE, K))) else 1L

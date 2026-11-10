@@ -150,6 +150,15 @@ ms_decide <- function(grid, p, n, S, history, admis = c("closest", "adjacent"),
                       start = 1L, final = FALSE) {
   admis <- match.arg(admis)
   K <- n_combos(grid)
+  if (length(p) != K || length(n) != K || length(S) != K) {
+    stop("`p`, `n` and `S` must have one entry per combination.", call. = FALSE)
+  }
+  if (anyNA(p) || anyNA(n) || anyNA(S)) {
+    stop("`p`, `n` and `S` must not have missing values.", call. = FALSE)
+  }
+  if (!all(history %in% seq_len(K))) {
+    stop("`history` must hold combination indices of the grid.", call. = FALSE)
+  }
   d <- pipe_gain(p, 0.5)
   gamma <- pipe_estimate(grid, d, "MTD")
   if (is.null(safety)) {

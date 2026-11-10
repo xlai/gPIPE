@@ -128,3 +128,13 @@ test_that("default start: top dose for Cheung MED, combination 1 otherwise", {
   expect_true(top %in% maximal_elements(gs, rep(TRUE, n_combos(gs))))
   expect_equal(pipe_trial_design(gs, b, "MTD", N = 10)$start, 1L)
 })
+
+test_that("an M&S design with the safety rule checks the grid when it is built", {
+  g <- DoseGrid(levels = c(3, 3, 3))
+  model <- outcome_beta(0.3, 0.3, 0.7)
+  expect_silent(pipe_trial_design(g, model, "MTD", N = 10, rule = "ms"))
+  local_mocked_bindings(upset_sweep_plan = function(grid, ...) stop("too wide", call. = FALSE))
+  expect_error(pipe_trial_design(g, model, "MTD", N = 10, rule = "ms"), "too wide")
+  expect_silent(pipe_trial_design(g, model, "MTD", N = 10, rule = "ms", safety = NULL))
+  expect_silent(pipe_trial_design(g, model, "MTD", N = 10, rule = "cheung"))
+})

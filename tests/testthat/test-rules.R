@@ -117,3 +117,55 @@ test_that("M&S decision with the safety rule works for three drugs", {
   expect_equal(out$safe, which(out$q < 0.8))
   expect_true(all(out$candidates %in% out$admissible))
 })
+
+test_that("M&S decisions keep their set relations under every option", {
+  keep <- array(TRUE, c(3, 3, 2))
+  keep[2, 2, 1] <- FALSE
+  grids <- list(DoseGrid(levels = c(4, 4)), DoseGrid(levels = c(3, 3, 3)),
+                DoseGrid(levels = c(3, 3, 2), keep = keep))
+  set.seed(25)
+  for (g in grids) {
+    K <- n_combos(g)
+    C <- oracle_upsets(g)
+    for (rep in 1:5) {
+      n <- sample(0:4, K, replace = TRUE)
+      x <- stats::rbinom(K, n, stats::plogis(-2.5 + 0.6 * rowSums(g@combos - 1)))
+      p <- beta_exceedance(0.3, 0.3, 0.7, n, x)
+      history <- c(1L, sample(K, 2))
+      w <- exp(drop(C %*% stats::qlogis(p)))
+      q_ref <- drop(crossprod(C, w / sum(w)))
+      for (admis in c("closest", "adjacent")) {
+        for (constraint in c("neighbouring", "non-neighbouring")) {
+          out <- ms_decide(g, p, n, S = n + 1, history = history, admis = admis,
+                           constraint = constraint, final = TRUE)
+          info <- paste(paste(g@levels, collapse = "x"), admis, constraint, rep)
+          expect_equal(out$q, q_ref, tolerance = 1e-12, info = info)
+          expect_true(is_upset(g, out$mode), info = info)
+          expect_equal(out$safe, which(q_ref < 0.8), info = info)
+          expect_equal(out$admissible, intersect(out$neighbourhood, out$safe), info = info)
+          expect_equal(out$stopped, !length(out$admissible), info = info)
+          if (out$stopped) {
+            expect_equal(out$rpII, integer(), info = info)
+          } else {
+            expect_true(length(out$candidates) > 0, info = info)
+            expect_true(all(out$candidates %in% out$admissible), info = info)
+            expect_equal(sum(out$prob), 1, info = info)
+            expect_true(all(which(out$prob > 0) %in% out$candidates), info = info)
+            expect_true(all(out$mode[out$rpII] == 0 & n[out$rpII] > 0 &
+                              out$rpII %in% out$safe), info = info)
+          }
+        }
+      }
+    }
+  }
+})
+
+test_that("ms_decide checks its inputs", {
+  g <- DoseGrid(levels = c(2, 2))
+  p <- c(0.1, 0.3, 0.4, 0.8)
+  n <- rep(1, 4)
+  expect_error(ms_decide(g, p[-1], n, S = n + 1, history = 1L), "one entry per combination")
+  expect_error(ms_decide(g, p, n, S = n[-1], history = 1L), "one entry per combination")
+  expect_error(ms_decide(g, c(NA, p[-1]), n, S = n + 1, history = 1L), "missing")
+  expect_error(ms_decide(g, p, n, S = n + 1, history = c(1L, 5L)), "combination indices")
+})
