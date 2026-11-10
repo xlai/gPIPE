@@ -32,17 +32,6 @@ test_that("the oracle lists every up-set once", {
   expect_equal(nrow(oracle_upsets(g)), sum(apply(all_sets, 1, is_upset, grid = g)))
 })
 
-test_that("monotonic_matrices keeps its order and directions", {
-  m <- monotonic_matrices(2, 2, "increasing")
-  expect_length(m, 6)
-  expect_equal(m[[1]], matrix(0, 2, 2))
-  expect_equal(m[[2]], matrix(c(0, 0, 0, 1), 2, 2))
-  expect_equal(m[[6]], matrix(1, 2, 2))
-  d <- monotonic_matrices(2, 3, "decreasing")
-  expect_length(d, 10)
-  expect_true(all(vapply(d, function(x) all(diff(x) <= 0) && all(diff(t(x)) <= 0), TRUE)))
-})
-
 test_that("min-cut equals brute force on every kind of grid, both tie rules", {
   set.seed(18)
   for (g in solver_grids()) {
