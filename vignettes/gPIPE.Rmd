@@ -113,8 +113,8 @@ which uses `eps` itself.
 
 - Mander, A. P. and Sweeting, M. J. (2015). A product of independent beta
   probabilities dose escalation design for dual-agent phase I trials.
-  *Statistics in Medicine*, 34, 1261. doi:10.1002/sim.6434.
+  *Statistics in Medicine*, 34, 1261--1276. doi:10.1002/sim.6434.
 - Cheung, Y. K., Chandereng, T. and Diaz, K. M. (2022). A novel framework to
   estimate multidimensional minimum effective doses using asymmetric
-  posterior gain and epsilon-tapering. *Annals of Applied Statistics*.
-  doi:10.1214/21-AOAS1603.
+  posterior gain and epsilon-tapering. *Annals of Applied Statistics*,
+  16(3), 1445--1458. doi:10.1214/21-AOAS1549.

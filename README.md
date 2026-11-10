@@ -16,15 +16,14 @@ coverage](https://codecov.io/gh/xlai/gPIPE/graph/badge.svg)](https://app.codecov
 
 ## Generalized PIPE Design with Epsilon-Tapering for Dose-Finding Studies
 
-The gPIPE package implements a generalized Product of Independent Beta
-Probabilities Escalation (PIPE) design incorporating epsilon-tapering
-for dual-agent dose-finding studies. Building on Cheung et al.’s (2022)
-asymmetric posterior gain and epsilon-tapering framework, gPIPE improves
-dose-space exploration while effectively controlling false discovery
-rates. The implementation features flexible admissibility rules,
-multiple dose selection strategies, and robust simulation tools for
-design calibration, evaluation, and comparison with existing
-dose-finding methodologies.
+The gPIPE package implements the Product of Independent beta
+Probabilities Escalation (PIPE) design for drug-combination dose-finding
+trials, for any number of drugs. It covers the original PIPE design for
+the maximum tolerated dose contour of Mander and Sweeting (2015) and
+PIPE with epsilon-tapering for the minimum effective dose of Cheung,
+Chandereng and Diaz (2022). The estimate is found exactly by a minimum
+cut on the partial order of the dose combinations, and whole trials can
+be simulated to give operating characteristics.
 
 ## Installation
 
