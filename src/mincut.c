@@ -39,6 +39,9 @@ static void bfs(int root, int backward, int n_nodes, const int *first, const int
 }
 
 SEXP gpipe_mincut(SEXP lower_, SEXP upper_, SEXP d_, SEXP tol_, SEXP largest_) {
+  if (TYPEOF(lower_) != INTSXP || TYPEOF(upper_) != INTSXP || TYPEOF(d_) != REALSXP) {
+    error("`lower` and `upper` must be integer and `d` numeric.");
+  }
   const int K = LENGTH(d_);
   const int E = LENGTH(lower_);
   const int *lower = INTEGER(lower_);
@@ -48,8 +51,16 @@ SEXP gpipe_mincut(SEXP lower_, SEXP upper_, SEXP d_, SEXP tol_, SEXP largest_) {
   const int largest = asLogical(largest_);
   const int s = K, t = K + 1, n_nodes = K + 2;
 
+  /* Check the input here: a bad index or gain would write outside the arrays. */
+  if (LENGTH(upper_) != E) error("`lower` and `upper` must have the same length.");
+  for (int e = 0; e < E; e++) {
+    if (lower[e] < 1 || lower[e] > K || upper[e] < 1 || upper[e] > K) {
+      error("The cover edges must be combination indices between 1 and length(d).");
+    }
+  }
   int n_term = 0;
   for (int k = 0; k < K; k++) {
+    if (!R_FINITE(d[k])) error("`d` must be finite.");
     if (d[k] != 0) n_term++;
   }
   const int n_arcs = 2 * (n_term + E);

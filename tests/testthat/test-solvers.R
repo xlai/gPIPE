@@ -247,4 +247,25 @@ test_that("the compiled min-cut gives the same up-set as the plain R solver (#33
   d <- c(rep(-27.6 * 60, 6), rep(0, 4), rep(27.6 * 60, 6))
   expect_identical(gPIPE:::solve_mincut(g, d), ref_mincut(g, d))
   expect_identical(gPIPE:::solve_mincut(g, as.integer(d)), ref_mincut(g, d))
+  # all gains zero: the tie rule alone decides
+  expect_identical(gPIPE:::solve_mincut(g, rep(0, 16)), rep(1L, 16))
+  expect_identical(gPIPE:::solve_mincut(g, rep(0, 16), largest = FALSE), rep(0L, 16))
+  # one combination, no edges
+  g1 <- DoseGrid(levels = 1L)
+  for (d in c(0.5, -0.5, 0)) {
+    expect_identical(gPIPE:::solve_mincut(g1, d), ref_mincut(g1, d))
+  }
+})
+
+test_that("the compiled min-cut stops on bad input instead of reading outside its arrays", {
+  g <- DoseGrid(levels = c(3, 3))
+  expect_error(gPIPE:::solve_mincut(g, c(NaN, rep(1, 8))), "finite")
+  expect_error(gPIPE:::solve_mincut(g, c(NA, rep(1, 8))), "finite")
+  expect_error(gPIPE:::solve_mincut(g, c(Inf, rep(1, 8))), "finite")
+  expect_error(gPIPE:::solve_mincut(g, c(1, 2)), "combination indices")
+  pl <- gPIPE:::grid_plain(g)
+  pl$upper <- pl$upper[-1]
+  expect_error(gPIPE:::solve_mincut(pl, rep(1, 9)), "same length")
+  pl$upper <- as.numeric(gPIPE:::grid_plain(g)$upper)
+  expect_error(gPIPE:::solve_mincut(pl, rep(1, 9)), "integer")
 })
