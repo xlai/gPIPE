@@ -27,14 +27,15 @@
 # not the total, so that weights n + 1 on a large grid do not turn small real
 # gains into ties.
 solve_mincut <- function(grid, d, largest = TRUE) {
-  K <- n_combos(grid)
+  grid <- grid_plain(grid)
+  K <- grid$K
   s <- K + 1L
   t <- K + 2L
   pos <- which(d > 0)
   neg <- which(d < 0)
-  from <- c(rep(s, length(pos)), neg, grid@edges[, "lower"])
-  to <- c(pos, rep(t, length(neg)), grid@edges[, "upper"])
-  cap <- c(d[pos], -d[neg], rep(Inf, nrow(grid@edges)))
+  from <- c(rep(s, length(pos)), neg, grid$lower)
+  to <- c(pos, rep(t, length(neg)), grid$upper)
+  cap <- c(d[pos], -d[neg], rep(Inf, length(grid$lower)))
   tol <- 1e-10 * (1 + max(abs(d)))
 
   # Edge i and its reverse are stored at 2i - 1 and 2i.
@@ -107,8 +108,9 @@ solve_mincut <- function(grid, d, largest = TRUE) {
 
 # PIPE estimate gamma (0/1 over the combinations) from score differences d.
 pipe_estimate <- function(grid, d, target = c("MTD", "MED")) {
-  target <- match.arg(target)
-  if (length(d) != n_combos(grid)) {
+  target <- arg_one(target, c("MTD", "MED"))
+  grid <- grid_plain(grid)
+  if (length(d) != grid$K) {
     stop("`d` must have one entry per combination.", call. = FALSE)
   }
   if (anyNA(d)) {
@@ -133,13 +135,14 @@ pipe_estimate <- function(grid, d, target = c("MTD", "MED")) {
 # grows with the width of the grid (2,392 on 5 x 5 x 5); above `max_states`
 # the sweep stops with an error.
 upset_sweep_plan <- function(grid, max_states = 1e5) {
-  key <- paste(c(grid@levels, "|", which(!is.na(grid@lookup))), collapse = ",")
+  grid <- grid_plain(grid)
+  key <- grid$key %||% grid_key(grid)
   cached <- .solver_cache[[key]]
   if (!is.null(cached) && cached$peak <= max_states) {
     return(cached)
   }
-  e <- grid@edges
-  K <- n_combos(grid)
+  e <- grid$edges
+  K <- grid$K
   if (any(e[, "lower"] >= e[, "upper"])) {
     stop("The sweep needs every lower cover to come before its upper cover in the list.",
          call. = FALSE)
@@ -182,6 +185,11 @@ upset_sweep_plan <- function(grid, max_states = 1e5) {
   plan
 }
 
+# Cache key of a grid: its levels and the combinations it includes.
+grid_key <- function(grid) {
+  paste(c(grid$levels, "|", which(!is.na(grid$lookup))), collapse = ",")
+}
+
 .solver_cache <- new.env(parent = emptyenv())
 
 # Mander & Sweeting (2015) safety: the posterior probability that each
@@ -196,7 +204,8 @@ upset_sweep_plan <- function(grid, max_states = 1e5) {
 # (alpha), a backward pass the same for all completions (beta), and
 # q_k = sum over transitions with gamma_k = 1 of alpha x weight x beta / total.
 upset_exceedance <- function(grid, p, max_states = 1e5) {
-  K <- n_combos(grid)
+  grid <- grid_plain(grid)
+  K <- grid$K
   if (length(p) != K) {
     stop("`p` must have one entry per combination.", call. = FALSE)
   }

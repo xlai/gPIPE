@@ -86,3 +86,39 @@ test_that("a three-drug grid round-trips between array and vector views", {
   expect_equal(combo_index(g, c(2, 3, 2)), 12L)
   expect_equal(nrow(g@edges), 1 * 3 * 2 + 2 * 2 * 2 + 2 * 3 * 1)
 })
+
+test_that("the plain-list view of a grid gives the same answers as the DoseGrid", {
+  keep <- array(TRUE, c(3, 2, 2))
+  keep[3, 2, 2] <- keep[1, 1, 1] <- FALSE
+  for (g in list(DoseGrid(levels = c(4, 3)), DoseGrid(levels = c(3, 2, 2), keep = keep))) {
+    pl <- gPIPE:::grid_plain(g)
+    K <- n_combos(g)
+    expect_identical(gPIPE:::grid_plain(pl), pl)
+    expect_identical(n_combos(pl), K)
+    expect_identical(pl$edges, g@edges)
+    expect_identical(cbind(lower = pl$lower, upper = pl$upper), g@edges)
+    set.seed(K)
+    d <- round(rnorm(K), 1)
+    p <- runif(K)
+    gamma <- gPIPE:::pipe_estimate(g, d, "MTD")
+    expect_identical(gPIPE:::pipe_estimate(pl, d, "MTD"), gamma)
+    expect_identical(gPIPE:::pipe_estimate(pl, d, "MED"), gPIPE:::pipe_estimate(g, d, "MED"))
+    expect_identical(gPIPE:::upset_exceedance(pl, p), gPIPE:::upset_exceedance(g, p))
+    expect_identical(gPIPE:::cheung_candidates(pl, gamma), gPIPE:::cheung_candidates(g, gamma))
+    expect_identical(gPIPE:::pipe_final_set(pl, gamma, "MTD"), gPIPE:::pipe_final_set(g, gamma, "MTD"))
+    expect_identical(gPIPE:::grid_neighbourhood(pl, 2L), gPIPE:::grid_neighbourhood(g, 2L))
+    expect_identical(gPIPE:::is_upset(pl, gamma), TRUE)
+    args <- list(p = p, n = rep(1, K), S = rep(2, K), history = c(1L, 2L), admis = "adjacent")
+    expect_identical(do.call(gPIPE:::ms_decide, c(list(pl), args)),
+                     do.call(gPIPE:::ms_decide, c(list(g), args)))
+  }
+})
+
+test_that("arg_one() behaves like match.arg()", {
+  choices <- c("MTD", "MED")
+  expect_identical(gPIPE:::arg_one("MED", choices), "MED")
+  expect_identical(gPIPE:::arg_one(choices, choices), "MTD")
+  expect_identical(gPIPE:::arg_one("ME", choices), "MED")
+  expect_error(gPIPE:::arg_one("other", choices), "should be one of")
+  expect_error(gPIPE:::arg_one(1, choices))
+})

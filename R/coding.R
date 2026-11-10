@@ -81,7 +81,7 @@ beta_exceedance <- function(theta, a, b, n, x) {
 # solvers accept any positive weight vector. The weights are a design choice,
 # not part of the estimator.
 pipe_weights <- function(n, weights = c("n+1", "1")) {
-  weights <- match.arg(weights)
+  weights <- arg_one(weights, c("n+1", "1"))
   if (weights == "n+1") n + 1 else rep(1, length(n))
 }
 
@@ -106,7 +106,7 @@ pipe_weights <- function(n, weights = c("n+1", "1")) {
 # With eps = 0.5 both reduce to w_k qlogis(p_k). p is clipped to
 # [1e-12, 1 - 1e-12] so that certain doses keep a finite score.
 pipe_gain <- function(p, eps, w = 1, target = c("MTD", "MED")) {
-  target <- match.arg(target)
+  target <- arg_one(target, c("MTD", "MED"))
   check_eps(eps)
   p <- pmin(pmax(p, 1e-12), 1 - 1e-12)
   shift <- if (target == "MTD") log((1 - eps) / eps) else log(eps / (1 - eps))
@@ -128,4 +128,11 @@ check_eps <- function(eps) {
   if (!is.numeric(eps) || length(eps) != 1L || is.na(eps) || eps <= 0 || eps >= 1) {
     stop("`eps` must be a single number strictly between 0 and 1.", call. = FALSE)
   }
+}
+
+# match.arg() for functions the trial loop calls at every step: a value that
+# is already one of the choices is returned at once, and anything else (the
+# default vector, an abbreviation, a wrong value) goes to match.arg().
+arg_one <- function(arg, choices) {
+  if (length(arg) == 1L && is.character(arg) && arg %in% choices) arg else match.arg(arg, choices)
 }

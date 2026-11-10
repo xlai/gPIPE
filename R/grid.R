@@ -169,7 +169,7 @@ NULL
 #' @rdname grid-helpers
 #' @export
 n_combos <- function(grid) {
-  nrow(grid@combos)
+  if (is.list(grid)) grid$K else nrow(grid@combos)
 }
 
 #' @rdname grid-helpers
@@ -213,39 +213,63 @@ combo_labels <- function(grid) {
   do.call(paste, c(parts, sep = "."))
 }
 
+# The grid as a plain list, for the code that runs inside the trial loop.
+# Reading an S7 property costs a function call and a validity lookup each
+# time; a trial reads the grid thousands of times. The internal functions
+# below and in rules.R and solvers.R take either a DoseGrid or this list, and
+# pipe_trial_design() stores the list, so a simulation converts the grid once.
+#   K:                   number of combinations;
+#   levels, combos, lookup, edges: the DoseGrid properties;
+#   lower, upper:        the two columns of `edges`, as plain vectors.
+grid_plain <- function(grid) {
+  if (is.list(grid)) {
+    return(grid)
+  }
+  e <- grid@edges
+  list(K = nrow(grid@combos), levels = grid@levels, combos = grid@combos,
+       lookup = grid@lookup, edges = e, lower = unname(e[, "lower"]),
+       upper = unname(e[, "upper"]))
+}
+
 # Indices of the combinations covering k from above / below.
 upper_covers <- function(grid, k) {
-  grid@edges[grid@edges[, "lower"] == k, "upper"]
+  grid <- grid_plain(grid)
+  grid$edges[grid$edges[, "lower"] == k, "upper"]
 }
 
 lower_covers <- function(grid, k) {
-  grid@edges[grid@edges[, "upper"] == k, "lower"]
+  grid <- grid_plain(grid)
+  grid$edges[grid$edges[, "upper"] == k, "lower"]
 }
 
 # Combinations whose levels differ from combination k by at most `radius` in
 # every drug (k included).
 grid_neighbourhood <- function(grid, k, radius = 1L) {
-  delta <- abs(sweep(grid@combos, 2, grid@combos[k, ]))
+  grid <- grid_plain(grid)
+  delta <- abs(sweep(grid$combos, 2, grid$combos[k, ]))
   which(apply(delta <= radius, 1, all))
 }
 
 # TRUE when gamma (0/1 over the combinations) is an up-set: gamma never drops
 # when moving up the partial order.
 is_upset <- function(grid, gamma) {
-  e <- grid@edges
+  grid <- grid_plain(grid)
+  e <- grid$edges
   all(gamma[e[, "lower"]] <= gamma[e[, "upper"]])
 }
 
 # Minimal elements of the set `inside` (logical over combinations) and maximal
 # elements, both within the partial order of the grid.
 minimal_elements <- function(grid, inside) {
-  e <- grid@edges
+  grid <- grid_plain(grid)
+  e <- grid$edges
   blocked <- unique(e[inside[e[, "lower"]] & inside[e[, "upper"]], "upper"])
   setdiff(which(inside), blocked)
 }
 
 maximal_elements <- function(grid, inside) {
-  e <- grid@edges
+  grid <- grid_plain(grid)
+  e <- grid$edges
   blocked <- unique(e[inside[e[, "lower"]] & inside[e[, "upper"]], "lower"])
   setdiff(which(inside), blocked)
 }
