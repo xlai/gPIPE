@@ -75,17 +75,30 @@ beta_exceedance <- function(theta, a, b, n, x) {
 
 # ---- Scores -----------------------------------------------------------------
 
-# Per-dose weights: "n+1" for epsilon-tapering (Cheung et al. 2022), "1" for
-# the original PIPE (Mander & Sweeting 2015).
+# Per-dose weights, as two named presets: "n+1" is the recommendation of
+# Cheung et al. (2022) for epsilon-tapering, and "1" gives the original PIPE
+# (Mander & Sweeting 2015). This is only a convenience: pipe_gain() and the
+# solvers accept any positive weight vector. The weights are a design choice,
+# not part of the estimator.
 pipe_weights <- function(n, weights = c("n+1", "1")) {
   weights <- match.arg(weights)
   if (weights == "n+1") n + 1 else rep(1, length(n))
 }
 
-# Score difference d_k = gain(gamma_k = 1) - gain(gamma_k = 0), where the
-# gain is w log(eps P(state)) for the favourable state and
-# w log((1 - eps) P(state)) for the other one. The score of an up-set U is
-# sum(d[U]) plus a constant, so the solvers only need d.
+# Score difference d_k = gain_k(1) - gain_k(0), where gain_k(g) is the gain of
+# declaring gamma_k = g: w log(eps P(state)) for the favourable state and
+# w log((1 - eps) P(state)) for the other one.
+#
+# Why a difference and not a sum: the score of an up-set U adds, over all
+# doses, the gain of the state each dose is in,
+#
+#   score(U) = sum_{k in U} gain_k(1) + sum_{k not in U} gain_k(0)
+#            = sum_{all k} gain_k(0) + sum_{k in U} d_k.
+#
+# The first sum is the same for every U, so it drops out of the argmax and
+# the solvers only need d. (A sum gain_k(1) + gain_k(0) would not depend on U
+# at all, so it could not rank up-sets.) d_k > 0 means dose k is better in U,
+# d_k < 0 means it is better out.
 #
 #   MTD: d_k = w_k [log((1 - eps) p_k) - log(eps (1 - p_k))]
 #   MED: d_k = w_k [log(eps p_k) - log((1 - eps) (1 - p_k))]
