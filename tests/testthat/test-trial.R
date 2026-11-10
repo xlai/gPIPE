@@ -53,7 +53,7 @@ test_that("Cheung doses come from S1 u S0 of the current estimate", {
   expect_equal(t1$n_enrolled, 30)
 })
 
-test_that("M&S trials stop only through the safety rule, with no RPII", {
+test_that("M&S trials stop only through the safety rule, with no RP2D", {
   des <- beta_design("ms", cohort = 2)
   sim <- pipe_simulate(des, rep(0.9, 16), n_trials = 10, seed = 3)
   expect_true(all(sim$summary$stopped))

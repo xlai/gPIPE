@@ -45,6 +45,7 @@ Collate:
     'rules.R'
     'outcomes.R'
     'trial.R'
+    'api.R'
     'DrugCombiConstructor.R'
     'TrialConstructor.R'
     'DoseConfigurator.R'

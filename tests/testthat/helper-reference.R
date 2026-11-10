@@ -166,10 +166,10 @@ ref_ms_state <- function(spec) {
     out$prob <- prob / sum(prob)
   }
   if (isTRUE(spec$final)) {
-    out$rpII <- integer()
+    out$rp2d <- integer()
     if (!out$stopped) {
       closest <- ref_closest(levels, gamma, rep(TRUE, K))
-      out$rpII <- sort(closest[gamma[closest] == 0 & spec$n[closest] > 0 & safe[closest]])
+      out$rp2d <- sort(closest[gamma[closest] == 0 & spec$n[closest] > 0 & safe[closest]])
     }
   }
   out
