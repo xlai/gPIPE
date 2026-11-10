@@ -32,6 +32,8 @@ the median exactly.}
 \item{...}{Other \link{PipeDesign} properties, such as \code{N} (required), \code{cohort},
 \code{selection} or \code{sigma0}. Their defaults are those of \link{PipeDesign}.}
 
+\item{eps}{Asymmetry of the gain for \code{cheung_design()} (see \link{PipeDesign}).}
+
 \item{target}{\code{"MTD"} or \code{"MED"}.}
 
 \item{outcome}{\code{"binary"} (Beta priors \code{prior_a}, \code{prior_b}) or

@@ -103,6 +103,7 @@ design_list <- function(design) {
 #' et al. (2022), for MED (default) or MTD, with normal or binary outcomes.
 #'
 #' @inheritParams PipeDesign
+#' @param eps Asymmetry of the gain for `cheung_design()` (see [PipeDesign]).
 #' @param prior_median,prior_strength Prior median of each combination's
 #'   toxicity probability and prior strength a + b (one per combination or one
 #'   for all). M&S call strength 1 "strong" and 1 / K "weak".
