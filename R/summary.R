@@ -97,9 +97,8 @@ ms_band_table <- function(counts, truth, theta, breaks) {
     d <- 100 * (truth - theta)
     d[abs(d) < 1e-7] <- 0
     lab <- c("more than 10 below", "1-10 below", "at theta", "1-10 above", "more than 10 above")
-    band <- factor(lab[ifelse(d == 0, 3L, ifelse(d < -10, 1L, ifelse(d < 0, 2L,
-                                                                      ifelse(d > 10, 5L, 4L))))],
-                   levels = lab)
+    idx <- ifelse(d == 0, 3L, ifelse(d < -10, 1L, ifelse(d < 0, 2L, ifelse(d > 10, 5L, 4L))))
+    band <- factor(lab[idx], levels = lab)
   } else {
     band <- cut(truth, breaks, right = FALSE, include.lowest = TRUE)
   }
@@ -141,12 +140,17 @@ method(summary, PipeSimulation) <- function(object, band = NULL, tol = 1e-8, bre
   }
   n_tot <- rowSums(object@n)
   share <- function(sel) if (any(sel)) 100 * rowSums(object@n[, sel, drop = FALSE]) / n_tot else rep(NA_real_, nsim)
+  set_unfav <- if (any(unfav)) {
+    as.numeric(rowSums(fin[, unfav, drop = FALSE]) > 0)
+  } else {
+    rep(NA_real_, nsim)
+  }
   metrics <- rbind(
     mc_row("fdr", fdr), mc_row("tpr", tpr),
     if (!is.null(pcs)) mc_row("pcs", pcs),
     mc_row("pct_patients_favourable", share(fav)),
     mc_row("pct_patients_unfavourable", share(unfav)),
-    mc_row("p_set_unfavourable", if (any(unfav)) as.numeric(rowSums(fin[, unfav, drop = FALSE]) > 0) else rep(NA_real_, nsim)),
+    mc_row("p_set_unfavourable", set_unfav),
     mc_row("mean_recommended", rowSums(fin))
   )
 
