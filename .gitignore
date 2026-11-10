@@ -50,3 +50,8 @@ rsconnect/
 .DS_Store
 .quarto
 .Rproj.user
+
+# compiled code
+src/*.o
+src/*.so
+src/*.dll

@@ -1,4 +1,5 @@
 #' @import S7
+#' @useDynLib gPIPE, .registration = TRUE
 NULL
 
 .onLoad <- function(...) {
