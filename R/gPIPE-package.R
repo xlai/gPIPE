@@ -22,8 +22,8 @@
 #'
 #' Cheung, Y. K., Chandereng, T. and Diaz, K. M. (2022). A novel framework to
 #' estimate multidimensional minimum effective doses using asymmetric
-#' posterior gain and epsilon-tapering. *The Annals of Applied Statistics*.
-#' \doi{10.1214/21-AOAS1603}
+#' posterior gain and epsilon-tapering. *The Annals of Applied Statistics*,
+#' 16(3), 1445--1458. \doi{10.1214/21-AOAS1549}
 #'
 #' @keywords internal
 "_PACKAGE"

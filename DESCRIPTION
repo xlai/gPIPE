@@ -9,7 +9,7 @@ Description: Implements the Product of Independent beta Probabilities
     number of drugs. It covers the original PIPE design for the maximum
     tolerated dose contour of Mander and Sweeting (2015) <doi:10.1002/sim.6434>
     and PIPE with epsilon-tapering for the minimum effective dose of Cheung,
-    Chandereng and Diaz (2022) <doi:10.1214/21-aoas1603>. The estimate is
+    Chandereng and Diaz (2022) <doi:10.1214/21-AOAS1549>. The estimate is
     found exactly by a minimum cut on the partial order of the dose
     combinations, and whole trials can be simulated to give operating
     characteristics.
