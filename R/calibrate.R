@@ -163,10 +163,11 @@ calibrate_eps <- function(design, scenarios = NULL, n_scenarios = 20, nsim = 200
                tpr = mean(tpr, na.rm = TRUE))
   }
 
-  trace <- list()
+  trace <- new.env()
+  trace$rows <- list()
   ev <- function(eps) {
     r <- evaluate(eps)
-    trace[[length(trace) + 1L]] <<- r
+    trace$rows[[length(trace$rows) + 1L]] <- r
     r
   }
   best <- NULL
@@ -194,11 +195,13 @@ calibrate_eps <- function(design, scenarios = NULL, n_scenarios = 20, nsim = 200
       }
     }
   }
-  trace <- do.call(rbind, trace)
+  trace <- do.call(rbind, trace$rows)
   trace <- trace[order(trace$eps), ]
   eps_hat <- if (is.null(best)) NA_real_ else best$eps
   PipeCalibration(
-    design = if (is.na(eps_hat)) design else {
+    design = if (is.na(eps_hat)) {
+      design
+    } else {
       S7::set_props(design, eps = eps_hat)
     },
     eps = eps_hat, alpha = alpha,
