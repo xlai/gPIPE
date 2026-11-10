@@ -25,7 +25,8 @@ full grid; for normal outcomes a list with \code{mean} (vector or array) and
 }}
 }
 \value{
-A \code{PipeSimulation} with \verb{@summary} (one row per trial: patients
+A \code{PipeSimulation} with \verb{@truth} (the true probability or mean of
+each combination), \verb{@summary} (one row per trial: patients
 enrolled, early stop, single pick), and trials x combinations matrices
 \verb{@n} (patients), \verb{@s1} (events or outcome sums), \verb{@gamma} (final
 estimate) and \verb{@final_set} (membership of the final dose set).

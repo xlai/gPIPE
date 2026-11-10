@@ -272,7 +272,8 @@ PipeSimulation := new_class(
     s1 = class_double,
     gamma = class_double,
     final_set = class_logical,
-    trials = class_list
+    trials = class_list,
+    truth = new_property(class_double, default = numeric())
   )
 )
 
@@ -291,7 +292,8 @@ PipeSimulation := new_class(
 #'     `sd`.
 #'   * `keep_trials`: keep each trial's full result in `@trials` (default
 #'     `FALSE`).
-#' @return A `PipeSimulation` with `@summary` (one row per trial: patients
+#' @return A `PipeSimulation` with `@truth` (the true probability or mean of
+#'   each combination), `@summary` (one row per trial: patients
 #'   enrolled, early stop, single pick), and trials x combinations matrices
 #'   `@n` (patients), `@s1` (events or outcome sums), `@gamma` (final
 #'   estimate) and `@final_set` (membership of the final dose set).
@@ -314,7 +316,8 @@ method(simulate, PipeDesign) <- function(object, nsim = 1, seed = NULL, ..., tru
                        keep_trials = keep_trials)
   storage.mode(sim$n) <- storage.mode(sim$gamma) <- "double"
   PipeSimulation(design = object, summary = sim$summary, n = sim$n, s1 = sim$s1,
-                 gamma = sim$gamma, final_set = sim$final_set, trials = sim$trials)
+                 gamma = sim$gamma, final_set = sim$final_set, trials = sim$trials,
+                 truth = as.double(if (is.list(truth)) truth$mean else truth))
 }
 
 method(print, PipeSimulation) <- function(x, ...) {
