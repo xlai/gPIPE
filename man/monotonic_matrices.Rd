@@ -36,8 +36,10 @@ For dose-finding studies, these matrices can represent valid dose-toxicity relat
 In the "increasing" direction, a dose is acceptable only if all lower doses are also acceptable.
 In the "decreasing" direction, a dose is unacceptable only if all higher doses are also unacceptable.
 
-The function uses a recursive approach to build all possible matrices that satisfy
-the monotonicity constraints.
+The matrices are listed from the partial order of a \link{DoseGrid}, in the
+order of the original recursive version (cells read row by row, 0 before 1).
+This helper only serves the old Reference Class code and is removed with it;
+the new solvers do not list configurations.
 }
 \examples{
 # Generate all 2x2 matrices with increasing monotonicity
