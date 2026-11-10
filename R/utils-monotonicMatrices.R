@@ -25,8 +25,10 @@
 #' In the "increasing" direction, a dose is acceptable only if all lower doses are also acceptable.
 #' In the "decreasing" direction, a dose is unacceptable only if all higher doses are also unacceptable.
 #'
-#' The matrices come from the up-set enumeration of a [DoseGrid], in the
+#' The matrices are listed from the partial order of a [DoseGrid], in the
 #' order of the original recursive version (cells read row by row, 0 before 1).
+#' This helper only serves the old Reference Class code and is removed with it;
+#' the new solvers do not list configurations.
 #'
 #' @examples
 #' # Generate all 2x2 matrices with increasing monotonicity
@@ -38,7 +40,19 @@
 #' @export
 monotonic_matrices <- function(I, J, direction = c("increasing", "decreasing")) {
   direction <- match.arg(direction)
-  configs <- grid_upsets(DoseGrid(levels = c(I, J)))
+  grid <- DoseGrid(levels = c(I, J))
+  e <- grid@edges
+  configs <- matrix(0L, nrow = 1, ncol = 0)
+  for (k in seq_len(n_combos(grid))) {
+    below <- e[e[, "upper"] == k, "lower"]
+    forced <- if (length(below)) {
+      rowSums(configs[, below, drop = FALSE]) > 0L
+    } else {
+      rep(FALSE, nrow(configs))
+    }
+    free <- configs[!forced, , drop = FALSE]
+    configs <- rbind(cbind(configs, 1L), cbind(free, rep(0L, nrow(free))))
+  }
   if (direction == "decreasing") {
     configs <- 1L - configs
   }

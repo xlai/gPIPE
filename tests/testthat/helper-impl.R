@@ -7,8 +7,6 @@
 # so each refactor step (#18) makes its tests run by filling in the matching
 # entry of gpipe_impl():
 #
-# - enumerate: takes levels; returns a 0/1 matrix of all up-sets, one row
-#   each, or NULL when the grid is not supported.
 # - estimate: takes levels, p, n, eps, weights ("1" or "n+1") and target
 #   ("MTD" or "MED"); returns the 0/1 vector gamma. p = P(pi > theta | data).
 # - cheung_candidates: takes levels and gamma; returns the combination
@@ -18,7 +16,6 @@
 
 reference_impl <- function() {
   list(
-    enumerate = ref_upsets,
     estimate = ref_estimate,
     cheung_candidates = ref_cheung_candidates,
     ms_state = ref_ms_state
@@ -27,7 +24,6 @@ reference_impl <- function() {
 
 gpipe_impl <- function() {
   list(
-    enumerate = function(levels) grid_upsets(DoseGrid(levels = levels)),
     estimate = function(levels, p, n, eps, weights = c("1", "n+1"), target = c("MTD", "MED")) {
       target <- match.arg(target)
       w <- pipe_weights(n, match.arg(weights))

@@ -1,74 +1,19 @@
-# PIPE solvers (#18, step 3).
+# PIPE solvers (#18, step 3; #31).
 #
 # The PIPE estimate is the up-set U (gamma = 1 set) that maximises
-# sum(d[U]), with d from pipe_gain(). Two exact solvers:
-#
-# - enumeration of every up-set as one 0/1 matrix C (configurations x
-#   combinations), scored by C %*% d. Used for full grids of one or two drugs,
-#   and the only route that gives the M&S safety probabilities q;
-# - max-weight closure by min-cut, for any other grid.
+# sum(d[U]), with d from pipe_gain(). One exact solver finds it on every
+# grid: max-weight closure by min-cut. It only reads the cover relation
+# (grid@edges), so it does not depend on the number of drugs.
 #
 # Tie rule (decided 22 Oct): the smallest favourable set, that is the largest
 # U for MTD (largest toxic set) and the smallest U for MED. The largest and
 # smallest optimal up-sets are unique, being the union and intersection of all
 # optimal ones.
-
-# ---- Enumeration ------------------------------------------------------------
-
-# All up-sets of the grid's partial order as a 0/1 integer matrix, one row per
-# configuration, one column per combination. Combinations are in array order,
-# so every lower cover of k has a smaller index and each column only depends on
-# columns already filled. Results are cached by grid.
-grid_upsets <- function(grid, max_configs = 1e6) {
-  key <- paste(c(grid@levels, "|", which(!is.na(grid@lookup))), collapse = ",")
-  cached <- .solver_cache[[key]]
-  if (!is.null(cached) && nrow(cached) <= max_configs) {
-    return(cached)
-  }
-  e <- grid@edges
-  configs <- matrix(0L, nrow = 1, ncol = 0)
-  for (k in seq_len(n_combos(grid))) {
-    below <- e[e[, "upper"] == k, "lower"]
-    forced <- if (length(below)) {
-      rowSums(configs[, below, drop = FALSE]) > 0L
-    } else {
-      rep(FALSE, nrow(configs))
-    }
-    free <- configs[!forced, , drop = FALSE]
-    if (nrow(configs) + nrow(free) > max_configs) {
-      stop("The grid has more than `max_configs` up-sets; use the min-cut solver.",
-           call. = FALSE)
-    }
-    configs <- rbind(cbind(configs, 1L), cbind(free, rep(0L, nrow(free))))
-  }
-  .solver_cache[[key]] <- configs
-  configs
-}
-
-.solver_cache <- new.env(parent = emptyenv())
-
-# Best up-set among the rows of `configs` under the tie rule. Scores within
-# tol = 1e-10 (1 + max |score|) of the best count as ties.
-solve_enumeration <- function(configs, d, largest = TRUE) {
-  score <- drop(configs %*% d)
-  tol <- 1e-10 * (1 + max(abs(score)))
-  best <- which(score >= max(score) - tol)
-  size <- rowSums(configs[best, , drop = FALSE])
-  pick <- best[if (largest) which.max(size) else which.min(size)]
-  configs[pick, ]
-}
-
-# Mander & Sweeting (2015) safety: the posterior probability that each
-# combination is toxic, averaged over all up-sets with weights proportional
-# to the contour probabilities prod_U p_k prod_notU (1 - p_k). That is
-# softmax(C %*% qlogis(p)). It takes p, not the design's d: q never uses the
-# design's eps or weights. p is clipped as in pipe_gain().
-upset_exceedance <- function(configs, p) {
-  p <- pmin(pmax(p, 1e-12), 1 - 1e-12)
-  score <- drop(configs %*% stats::qlogis(p))
-  wts <- exp(score - max(score))
-  drop(crossprod(configs, wts / sum(wts)))
-}
+#
+# The Mander & Sweeting safety probabilities q are a different quantity: an
+# average over all up-sets, which a min-cut cannot give. upset_exceedance()
+# computes them exactly with a sweep over the combinations, without listing
+# the up-sets.
 
 # ---- Min-cut ----------------------------------------------------------------
 
@@ -159,30 +104,117 @@ solve_mincut <- function(grid, d, largest = TRUE) {
 # ---- Estimate ---------------------------------------------------------------
 
 # PIPE estimate gamma (0/1 over the combinations) from score differences d.
-# method = "auto" enumerates on full grids of one or two drugs with at most
-# `max_enumerate` up-sets, and uses min-cut otherwise.
-pipe_estimate <- function(grid, d, target = c("MTD", "MED"),
-                          method = c("auto", "enumerate", "mincut"),
-                          max_enumerate = 1e4) {
+pipe_estimate <- function(grid, d, target = c("MTD", "MED")) {
   target <- match.arg(target)
-  method <- match.arg(method)
   if (length(d) != n_combos(grid)) {
     stop("`d` must have one entry per combination.", call. = FALSE)
   }
-  if (method == "auto") {
-    small <- !anyNA(grid@lookup) && length(grid@levels) <= 2L &&
-      n_upsets_full(grid@levels) <= max_enumerate
-    method <- if (small) "enumerate" else "mincut"
-  }
-  largest <- target == "MTD"
-  if (method == "enumerate") {
-    solve_enumeration(grid_upsets(grid), d, largest)
-  } else {
-    solve_mincut(grid, d, largest)
-  }
+  solve_mincut(grid, d, largest = target == "MTD")
 }
 
-# Number of up-sets of a full grid of one or two drugs: choose(I + J, I).
-n_upsets_full <- function(levels) {
-  if (length(levels) == 1L) levels + 1 else choose(sum(levels), levels[1])
+# ---- Safety probabilities ---------------------------------------------------
+
+# Sweep plan of a grid. The sweep visits the combinations in list order, which
+# puts every lower cover before its upper covers. After combination k it only
+# needs the 0/1 values of the "open" combinations: those visited that still
+# have an unvisited upper cover. A state is one 0/1 pattern on the open
+# combinations that an up-set can show. Step k lists the transitions:
+#   parent: state before k;
+#   choice: gamma_k (1 always allowed; 0 only when no lower cover is 1);
+#   child:  state after k;
+#   n:      number of states after k.
+# The plan depends on the grid only and is cached. The number of states is
+# small for two drugs (16 at most on a 6 x 6 grid, against 924 up-sets) and
+# grows with the width of the grid (2,392 on 5 x 5 x 5); above `max_states`
+# the sweep stops with an error.
+upset_sweep_plan <- function(grid, max_states = 1e5) {
+  key <- paste(c(grid@levels, "|", which(!is.na(grid@lookup))), collapse = ",")
+  cached <- .solver_cache[[key]]
+  if (!is.null(cached) && cached$peak <= max_states) {
+    return(cached)
+  }
+  e <- grid@edges
+  K <- n_combos(grid)
+  # last_use[k]: the last upper cover of k in list order (0 when it has none)
+  last_use <- integer(K)
+  if (nrow(e)) {
+    last <- tapply(e[, "upper"], e[, "lower"], max)
+    last_use[as.integer(names(last))] <- last
+  }
+  open <- integer()
+  states <- matrix(0L, nrow = 1, ncol = 0)
+  steps <- vector("list", K)
+  peak <- 1L
+  for (k in seq_len(K)) {
+    below <- e[e[, "upper"] == k, "lower"]
+    forced <- if (length(below)) {
+      rowSums(states[, match(below, open), drop = FALSE]) > 0L
+    } else {
+      rep(FALSE, nrow(states))
+    }
+    parent <- c(seq_len(nrow(states)), which(!forced))
+    choice <- rep(1:0, c(nrow(states), sum(!forced)))
+    keep <- last_use[c(open, k)] > k
+    new <- cbind(states[parent, , drop = FALSE], choice)[, keep, drop = FALSE]
+    open <- c(open, k)[keep]
+    id <- if (ncol(new)) do.call(paste0, as.data.frame(new)) else rep("", nrow(new))
+    first <- !duplicated(id)
+    states <- new[first, , drop = FALSE]
+    peak <- max(peak, nrow(states))
+    if (peak > max_states) {
+      stop("The safety probabilities need more than `max_states` sweep states on this grid.",
+           call. = FALSE)
+    }
+    steps[[k]] <- list(parent = parent, choice = choice, child = match(id, id[first]),
+                       n = nrow(states))
+  }
+  plan <- list(steps = steps, peak = peak)
+  .solver_cache[[key]] <- plan
+  plan
+}
+
+.solver_cache <- new.env(parent = emptyenv())
+
+# Mander & Sweeting (2015) safety: the posterior probability that each
+# combination is toxic, averaged over all up-sets with weights proportional
+# to the contour probabilities prod_U p_k prod_notU (1 - p_k). It takes p, not
+# the design's d: q never uses the design's eps or weights. p is clipped as
+# in pipe_gain().
+#
+# The weight of an up-set is exp(sum of qlogis(p) over U) up to a constant, so
+# q is a ratio of sums over up-sets. A forward pass over the sweep plan gives
+# log_sum_exp of the weights of all partial up-sets that end in each state
+# (alpha), a backward pass the same for all completions (beta), and
+# q_k = sum over transitions with gamma_k = 1 of alpha x weight x beta / total.
+upset_exceedance <- function(grid, p, max_states = 1e5) {
+  K <- n_combos(grid)
+  if (length(p) != K) {
+    stop("`p` must have one entry per combination.", call. = FALSE)
+  }
+  steps <- upset_sweep_plan(grid, max_states)$steps
+  logit <- stats::qlogis(pmin(pmax(p, 1e-12), 1 - 1e-12))
+  alpha <- vector("list", K + 1L)
+  alpha[[1L]] <- 0
+  for (k in seq_len(K)) {
+    s <- steps[[k]]
+    alpha[[k + 1L]] <- log_sum_exp_by(alpha[[k]][s$parent] + s$choice * logit[k], s$child)
+  }
+  total <- alpha[[K + 1L]]
+  beta <- 0
+  q <- numeric(K)
+  for (k in rev(seq_len(K))) {
+    s <- steps[[k]]
+    after <- beta[s$child] + s$choice * logit[k]
+    on <- s$choice == 1L
+    q[k] <- sum(exp(alpha[[k]][s$parent[on]] + after[on] - total))
+    beta <- log_sum_exp_by(after, s$parent)
+  }
+  # rounding can leave a sum a few ulp outside [0, 1]
+  pmin(pmax(q, 0), 1)
+}
+
+# log(sum(exp(x))) within each group; groups are 1, 2, ... and all occur.
+log_sum_exp_by <- function(x, group) {
+  top <- max(x)
+  log(drop(rowsum(exp(x - top), group))) + top
 }
