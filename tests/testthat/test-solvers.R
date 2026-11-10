@@ -1,52 +1,79 @@
-test_that("enumeration gives every up-set once", {
+# The package has one estimator (min-cut) and one routine for the M&S safety
+# probabilities (a sweep). Both are checked here against a brute-force list of
+# all up-sets, which only the tests build (#31).
+
+# All up-sets of a grid, one 0/1 row each, from the cover relation.
+oracle_upsets <- function(grid) {
+  e <- grid@edges
+  configs <- matrix(0L, nrow = 1, ncol = 0)
+  for (k in seq_len(n_combos(grid))) {
+    below <- e[e[, "upper"] == k, "lower"]
+    forced <- if (length(below)) {
+      rowSums(configs[, below, drop = FALSE]) > 0L
+    } else {
+      rep(FALSE, nrow(configs))
+    }
+    free <- configs[!forced, , drop = FALSE]
+    configs <- rbind(cbind(configs, 1L), cbind(free, rep(0L, nrow(free))))
+  }
+  configs
+}
+
+# Best up-set by brute force, with the tie rule.
+oracle_solve <- function(configs, d, largest) {
+  score <- drop(configs %*% d)
+  best <- which(score >= max(score) - 1e-10 * (1 + max(abs(score))))
+  size <- rowSums(configs[best, , drop = FALSE])
+  configs[best[if (largest) which.max(size) else which.min(size)], ]
+}
+
+# M&S q by brute force: contour probabilities prod_U p prod_notU (1 - p),
+# normalised over the up-sets.
+oracle_exceedance <- function(configs, p) {
+  prob <- apply(configs, 1, function(u) prod(ifelse(u == 1, p, 1 - p)))
+  drop(crossprod(configs, prob / sum(prob)))
+}
+
+solver_grids <- function() {
+  keep2 <- matrix(TRUE, 4, 5)
+  keep2[2, 3] <- FALSE
+  keep2[4, 1] <- FALSE
+  keep3 <- array(TRUE, c(3, 3, 2))
+  keep3[2, 2, 1] <- FALSE
+  list(DoseGrid(levels = 5), DoseGrid(levels = c(4, 4)), DoseGrid(levels = c(2, 5)),
+       DoseGrid(levels = c(5, 3)), DoseGrid(levels = c(4, 5), keep = keep2),
+       DoseGrid(levels = c(3, 3, 3)), DoseGrid(levels = c(3, 3, 2), keep = keep3),
+       DoseGrid(levels = c(2, 2, 2, 2)))
+}
+
+test_that("the oracle lists every up-set once", {
   # binomial(I + J, I) in 2D; 980 monotone 3 x 3 x 3 arrays
   for (case in list(list(c(6, 6), 924), list(c(4, 4), 70), list(c(3, 5), 56),
                     list(c(1, 4), 5), list(c(3, 3, 3), 980))) {
     g <- DoseGrid(levels = case[[1]])
-    C <- grid_upsets(g)
+    C <- oracle_upsets(g)
     expect_equal(nrow(C), case[[2]])
     expect_true(all(apply(C, 1, is_upset, grid = g)))
     expect_equal(anyDuplicated(apply(C, 1, paste, collapse = "")), 0L)
   }
-  expect_error(grid_upsets(DoseGrid(levels = c(4, 4)), max_configs = 10), "min-cut")
-})
-
-test_that("enumeration works on a grid with a combination left out", {
+  # a grid with a combination left out: brute force over all 2^8 subsets
   keep <- matrix(TRUE, 3, 3)
   keep[2, 2] <- FALSE
   g <- DoseGrid(levels = c(3, 3), keep = keep)
-  C <- grid_upsets(g)
-  expect_true(all(apply(C, 1, is_upset, grid = g)))
-  # brute force over all 2^8 subsets
   all_sets <- as.matrix(expand.grid(rep(list(0:1), 8)))
-  expect_equal(nrow(C), sum(apply(all_sets, 1, is_upset, grid = g)))
+  expect_equal(nrow(oracle_upsets(g)), sum(apply(all_sets, 1, is_upset, grid = g)))
 })
 
-test_that("monotonic_matrices keeps its order and directions", {
-  m <- monotonic_matrices(2, 2, "increasing")
-  expect_length(m, 6)
-  expect_equal(m[[1]], matrix(0, 2, 2))
-  expect_equal(m[[2]], matrix(c(0, 0, 0, 1), 2, 2))
-  expect_equal(m[[6]], matrix(1, 2, 2))
-  d <- monotonic_matrices(2, 3, "decreasing")
-  expect_length(d, 10)
-  expect_true(all(vapply(d, function(x) all(diff(x) <= 0) && all(diff(t(x)) <= 0), TRUE)))
-})
-
-test_that("min-cut equals enumeration on random grids, both tie rules", {
+test_that("min-cut equals brute force on every kind of grid, both tie rules", {
   set.seed(18)
-  keep <- array(TRUE, c(3, 3, 2))
-  keep[2, 2, 1] <- FALSE
-  grids <- list(DoseGrid(levels = c(4, 4)), DoseGrid(levels = c(2, 5)),
-                DoseGrid(levels = c(3, 3, 2)), DoseGrid(levels = c(3, 3, 2), keep = keep))
-  for (g in grids) {
-    C <- grid_upsets(g)
+  for (g in solver_grids()) {
+    C <- oracle_upsets(g)
     K <- n_combos(g)
     for (rep in 1:30) {
       # half the time integer gains, which give many exact ties
       d <- if (rep %% 2) stats::rnorm(K) else sample(-2:2, K, replace = TRUE)
       for (largest in c(TRUE, FALSE)) {
-        expect_equal(solve_mincut(g, d, largest), solve_enumeration(C, d, largest),
+        expect_equal(solve_mincut(g, d, largest), oracle_solve(C, d, largest),
                      info = paste(paste(g@levels, collapse = "x"), rep, largest))
       }
     }
@@ -54,49 +81,73 @@ test_that("min-cut equals enumeration on random grids, both tie rules", {
 })
 
 test_that("exact ties go to the smallest favourable set", {
-  for (method in c("enumerate", "mincut")) {
-    g <- DoseGrid(levels = c(3, 4))
-    expect_equal(pipe_estimate(g, rep(0, 12), "MTD", method), rep(1L, 12))
-    expect_equal(pipe_estimate(g, rep(0, 12), "MED", method), rep(0L, 12))
+  g <- DoseGrid(levels = c(3, 4))
+  expect_equal(pipe_estimate(g, rep(0, 12), "MTD"), rep(1L, 12))
+  expect_equal(pipe_estimate(g, rep(0, 12), "MED"), rep(0L, 12))
+})
+
+test_that("pipe_estimate uses the same solver for any number of drugs", {
+  set.seed(3)
+  for (g in list(DoseGrid(levels = c(5, 5)), DoseGrid(levels = c(2, 2, 2)))) {
+    d <- stats::rnorm(n_combos(g))
+    expect_equal(pipe_estimate(g, d), solve_mincut(g, d, largest = TRUE))
+    expect_equal(pipe_estimate(g, d, "MED"), solve_mincut(g, d, largest = FALSE))
+    expect_true(is_upset(g, pipe_estimate(g, d)))
+  }
+  expect_error(pipe_estimate(DoseGrid(levels = c(5, 5)), stats::rnorm(8)),
+               "one entry per combination")
+  # a grid far too large to list its up-sets
+  g <- DoseGrid(levels = c(10, 10))
+  expect_true(is_upset(g, pipe_estimate(g, stats::rnorm(100))))
+})
+
+test_that("upset_exceedance is the M&S contour average on every kind of grid", {
+  set.seed(31)
+  for (g in solver_grids()) {
+    C <- oracle_upsets(g)
+    K <- n_combos(g)
+    for (rep in 1:10) {
+      p <- stats::runif(K)
+      expect_equal(upset_exceedance(g, p), oracle_exceedance(C, p), tolerance = 1e-12,
+                   info = paste(paste(g@levels, collapse = "x"), rep))
+    }
   }
 })
 
-test_that("auto enumerates only small 2D grids", {
-  expect_equal(n_upsets_full(c(6, 6)), 924)
-  expect_equal(n_upsets_full(4), 5)
-  expect_equal(n_upsets_full(c(10, 10)), 184756)
-  # 10 x 10 goes to min-cut, so no up-sets are listed (and none cached)
-  g <- DoseGrid(levels = c(10, 10))
-  key <- paste(c(g@levels, "|", seq_len(100)), collapse = ",")
-  set.seed(10)
-  gamma <- pipe_estimate(g, stats::rnorm(100))
-  expect_true(is_upset(g, gamma))
-  expect_null(.solver_cache[[key]])
-  # with a lower limit, 6 x 6 goes to min-cut as well
-  local_mocked_bindings(grid_upsets = function(...) stop("enumerated"))
-  d <- stats::rnorm(36)
-  expect_silent(pipe_estimate(DoseGrid(levels = c(6, 6)), d, max_enumerate = 100))
-  expect_error(pipe_estimate(DoseGrid(levels = c(6, 6)), d), "enumerated")
-})
-
-test_that("auto uses enumeration in 2D and min-cut otherwise", {
-  g2 <- DoseGrid(levels = c(5, 5))
-  g3 <- DoseGrid(levels = c(2, 2, 2))
-  set.seed(3)
-  d2 <- stats::rnorm(25)
-  d3 <- stats::rnorm(8)
-  expect_equal(pipe_estimate(g2, d2), pipe_estimate(g2, d2, method = "enumerate"))
-  expect_equal(pipe_estimate(g3, d3), pipe_estimate(g3, d3, method = "mincut"))
-  expect_error(pipe_estimate(g2, d3), "one entry per combination")
-})
-
-test_that("upset_exceedance is the M&S contour average", {
+test_that("upset_exceedance handles certain doses and checks its input", {
   g <- DoseGrid(levels = c(2, 3))
-  C <- grid_upsets(g)
-  p <- c(0.1, 0.4, 0.3, 0.6, 0.5, 0.9)
-  # contour probability prod_U p prod_notU (1 - p), normalised
-  prob <- apply(C, 1, function(u) prod(ifelse(u == 1, p, 1 - p)))
-  prob <- prob / sum(prob)
-  expect_equal(upset_exceedance(C, p), drop(crossprod(C, prob)))
-  expect_true(all(is.finite(upset_exceedance(C, c(0, 1, 0, 1, 0, 1)))))
+  q <- upset_exceedance(g, c(0, 1, 0, 1, 0, 1))
+  expect_true(all(is.finite(q) & q >= 0 & q <= 1))
+  # p = 0.5 everywhere: every up-set is equally likely
+  C <- oracle_upsets(g)
+  expect_equal(upset_exceedance(g, rep(0.5, 6)), colMeans(C))
+  expect_error(upset_exceedance(g, rep(0.5, 5)), "one entry per combination")
+})
+
+test_that("the sweep needs few states and stops above its limit", {
+  expect_equal(upset_sweep_plan(DoseGrid(levels = c(6, 6)))$peak, 16)
+  expect_equal(upset_sweep_plan(DoseGrid(levels = c(4, 4, 4)))$peak, 372)
+  # 4 x 4 x 4 has 232,848 up-sets; q is still a probability and rises with dose
+  g <- DoseGrid(levels = c(4, 4, 4))
+  set.seed(4)
+  q <- upset_exceedance(g, stats::runif(64))
+  expect_true(all(q >= 0 & q <= 1))
+  expect_true(all(q[g@edges[, "lower"]] <= q[g@edges[, "upper"]] + 1e-12))
+  expect_error(upset_exceedance(DoseGrid(levels = c(3, 3, 3)), rep(0.5, 27), max_states = 10),
+               "max_states")
+})
+
+test_that("min-cut and the sweep reproduce the pipe.design snapshots", {
+  for (setting in c("V5", "V6")) {
+    states <- read_pipe_design_states(setting)
+    g <- DoseGrid(levels = states[[1]]$spec$levels)
+    for (s in states) {
+      sp <- s$spec
+      p <- beta_exceedance(sp$theta, sp$a, sp$b, sp$n, sp$r)
+      expect_equal(pipe_estimate(g, pipe_gain(p, 0.5), "MTD"), s$expected$mode, info = s$id)
+      q <- upset_exceedance(g, p)
+      expect_equal(q, s$expected$q, tolerance = 1e-10, info = s$id)
+      expect_equal(which(q < sp$safety), s$expected$safe, info = s$id)
+    }
+  }
 })

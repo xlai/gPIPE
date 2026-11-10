@@ -135,9 +135,9 @@ ms_selection_weights <- function(candidates, S,
 
 # One M&S decision on fixed data. p = P(pi > theta | data), n patients per
 # dose, S = a + b + n, history = doses given so far (one per cohort). With
-# `safety = NULL` the safety rule is off and no q is computed. The safety
-# rule needs every up-set (grid_upsets()), so with it on ms_decide() is for
-# grids of one or two drugs, or other small grids, only.
+# `safety = NULL` the safety rule is off and no q is computed. With it on, q
+# comes from upset_exceedance(), on any grid whose sweep fits its state limit
+# (every realistic grid of two or three drugs).
 #
 # Returns p, the mode contour, q, the safe, constraint and admissible sets,
 # and whether the trial stops (no admissible dose; pipe.design gives no RPII
@@ -151,14 +151,12 @@ ms_decide <- function(grid, p, n, S, history, admis = c("closest", "adjacent"),
   admis <- match.arg(admis)
   K <- n_combos(grid)
   d <- pipe_gain(p, 0.5)
+  gamma <- pipe_estimate(grid, d, "MTD")
   if (is.null(safety)) {
-    gamma <- pipe_estimate(grid, d, "MTD")
     q <- NULL
     safe <- rep(TRUE, K)
   } else {
-    configs <- grid_upsets(grid)
-    gamma <- solve_enumeration(configs, d, largest = TRUE)
-    q <- upset_exceedance(configs, p)
+    q <- upset_exceedance(grid, p)
     safe <- q < safety
   }
   allowed <- seq_len(K) %in% ms_constraint(grid, history, constraint, start)

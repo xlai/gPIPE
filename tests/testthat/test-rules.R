@@ -61,7 +61,7 @@ test_that("closest rule treats inadmissible doses as neither", {
 test_that("adjacent rule matches the 2D matrix version", {
   set.seed(4)
   g <- DoseGrid(levels = c(4, 5))
-  C <- grid_upsets(g)
+  C <- ref_upsets(c(4, 5))
   for (r in sample(nrow(C), 30)) {
     old <- which(c(calculateAdjacentDoses(C[r, ], 4, 5)))
     expect_equal(ms_adjacent(g, C[r, ]), old)
@@ -100,4 +100,20 @@ test_that("M&S decision without the safety rule uses the estimate only", {
   expect_true(all(out$candidates %in% out$neighbourhood))
   expect_equal(sum(out$prob), 1)
   expect_true(all(n[out$rpII] > 0 & out$mode[out$rpII] == 0))
+})
+
+test_that("M&S decision with the safety rule works for three drugs", {
+  g <- DoseGrid(levels = c(3, 3, 3))
+  set.seed(31)
+  n <- sample(0:4, 27, replace = TRUE)
+  x <- stats::rbinom(27, n, stats::plogis(-2 + 0.7 * rowSums(g@combos - 1)))
+  p <- beta_exceedance(0.3, 0.3, 0.7, n, x)
+  out <- ms_decide(g, p, n, S = n + 1, history = c(1L, 2L, 5L))
+  # brute force over the 980 up-sets
+  C <- ref_upsets(c(3, 3, 3))
+  w <- exp(drop(C %*% stats::qlogis(p)))
+  expect_equal(out$q, drop(crossprod(C, w / sum(w))), tolerance = 1e-12)
+  expect_equal(out$mode, ref_solve(c(3, 3, 3), ref_gain(p), largest = TRUE))
+  expect_equal(out$safe, which(out$q < 0.8))
+  expect_true(all(out$candidates %in% out$admissible))
 })
