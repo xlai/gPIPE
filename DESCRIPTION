@@ -39,6 +39,7 @@ Collate:
     'outcomes.R'
     'trial.R'
     'api.R'
+    'summary.R'
     'zzz.R'
 URL: https://github.com/xlai/gPIPE
 BugReports: https://github.com/xlai/gPIPE/issues
