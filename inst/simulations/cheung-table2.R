@@ -12,7 +12,7 @@ if (!exists("here")) here <- local({
   a <- grep("^--file=", commandArgs(FALSE), value = TRUE)
   if (length(a)) dirname(normalizePath(sub("^--file=", "", a[1]))) else getwd()
 })
-source(file.path(here, "cheung-table2-report.R"))
+source(file.path(here, "cheung-table2-report.R"), local = TRUE)
 
 K_LEVELS <- 5L
 N_TRIALS <- 125L

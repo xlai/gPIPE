@@ -21,7 +21,10 @@ be varied if a cell fails):
 
 1. **Posterior for the normal outcome.** Cheung's sigma handling is not
    published. gPIPE uses a pooled-variance t posterior under a flat prior,
-   with `sigma0 = 0.16` until a variance can be estimated.
+   with `sigma0 = 0.16` until a variance can be estimated. This is the primary
+   run. The variant `cell` gives every combination its own variance (flat prior
+   on the mean, 1/sigma on the SD, so a t posterior with n - 1 degrees of
+   freedom; known SD below 2 patients), which is how Sec. 2.2 of the paper reads.
 2. **TPR in the all-ineffective scenario** (eq. 8 is 0/0). Primary: that
    scenario is left out of the TPR average (as `summary()` does). Variants
    reported: count it as 0, or as 1.
@@ -32,7 +35,9 @@ be varied if a cell fails):
 
 Run:
 
-    Rscript inst/simulations/cheung-table2.R main   [reps]   # five designs
+    Rscript inst/simulations/cheung-table2.R main   [reps]   # five designs, pooled posterior
+    Rscript inst/simulations/cheung-table2.R main 400 cell   # same, per-cell posterior (setting 1)
     Rscript inst/simulations/cheung-table2.R calib           # soft epsilon check
 
-The calibrated epsilon is reported only; it is not a pass/fail gate.
+The calibrated epsilon is reported only; it is not a pass/fail gate. Results, with
+the two 15-cell tables, are in `cheung-table2-results.md`.
