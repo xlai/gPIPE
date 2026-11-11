@@ -144,6 +144,10 @@ cal <- calibrate_eps(des, n_scenarios = 3, nsim = 10, tol = 0.1, seed = 1)
 cal
 ```
 
+```{r, eval = requireNamespace("ggplot2", quietly = TRUE), fig.width = 5, fig.height = 3.5}
+plot(cal)
+```
+
 The calibrated design is `cal@design`.
 
 ## References

@@ -24,6 +24,10 @@ drugs as a bar per combination. For a \code{PipeCalibration} it plots FDR and TP
 against \code{eps}, with the target \code{alpha} and the chosen \code{eps} marked.
 }
 \details{
+The "\% of trials selecting" value is per combination, so the columns need
+not sum to 100: a trial can select several combinations, or none if it stops
+early or declares an empty set.
+
 These methods need the ggplot2 package (in Suggests) and return a ggplot
 object, which can be changed or saved in the usual way.
 }
