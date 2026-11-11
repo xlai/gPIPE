@@ -35,20 +35,28 @@ band of half-width \code{band} around \code{theta}. For \code{target = "MTD"},
 \emph{unfavourable} is at least \code{theta + band} (toxic). For \code{target = "MED"} the
 sides swap: favourable (effective) is a mean of at least \code{theta + band}.
 Combinations inside the band are \emph{indifferent} and count for neither
-side. With \code{band = 0}, "above \code{theta}" means a parameter strictly above it.
+side. With \code{band = 0}, "above \code{theta}" means a parameter above it by more
+than a rounding error.
 
 The metrics (\verb{@metrics}, with Monte Carlo standard errors) are:
 \itemize{
-\item \code{fdr}, \code{tpr} (Cheung et al. 2022): among the combinations the final
-estimate declares favourable (\code{gamma} = 1 for MED, 0 for MTD), the
-proportion that are unfavourable (0 when none is declared), and the
-proportion of favourable combinations that are declared. Averaged over
-trials; trials with no favourable combination are left out of \code{tpr}.
+\item \code{fdr} (Cheung et al. 2022, eq. 7): the proportion of the final dose set
+(the MED or MTD set) that is unfavourable, 0 when the set is empty.
+Indifferent combinations count in the set's size but not as false.
+\item \code{tpr} (eq. 8): the proportion of favourable combinations that the final
+estimate declares favourable (\code{gamma} = 1 for MED, 0 for MTD). A
+stopped trial declares nothing, so it counts 0 in \code{fdr} and \code{tpr}; with
+many stops FDR is pulled down. Both are averaged over trials, and trials
+with no favourable combination are left out of \code{tpr}.
 \item \code{pcs} (Riviere et al. 2014, Wages): the proportion of trials whose single
 pick is a true MTD, a combination with \verb{|truth - theta| <= tol}. Trials
-with no pick count as failures. Binary MTD designs only.
+with no pick count as failures. Binary MTD designs only. It is \code{NA} when
+no combination is that close to \code{theta}; a wider \code{tol} gives a "within
+\code{tol} of the target" version.
 \item \code{pct_patients_favourable}, \code{pct_patients_unfavourable}: the share of
-patients treated at each kind of combination (an overdose rate for MTD).
+patients treated at each kind of combination (an overdose rate for MTD),
+averaged over trials. This is not the pooled share in \verb{@by_combo}, and
+the two differ when trials stop early.
 \item \code{p_set_unfavourable}: the proportion of trials whose final dose set
 contains an unfavourable combination.
 \item \code{mean_recommended} (Mander & Sweeting 2015): the mean number of
@@ -56,11 +64,14 @@ combinations in the final set, counting 0 for a trial that stopped.
 }
 
 \verb{@bands} holds the Mander & Sweeting recommendation table: the final-set
-combinations pooled over trials, as a percentage by true-parameter band.
-The default bands are Table IV of that paper, by distance from \code{theta} in
-percentage points; give \code{breaks} (left-closed cut points on the true
-parameter, e.g. \code{c(0, .15, .25, .35, .46, 1)} for their Table III) to use
-your own.
+combinations pooled over trials, as a percentage by true-parameter band,
+with each trial that recommended nothing counted once as "None" in the
+denominator. The default bands follow Table IV of that paper, by distance
+from \code{theta} in percentage points (the paper's three bands, with the
+"more than 10" bands split by side). Only the recommendation percentages
+are given, not their experimentation percentages. Give \code{breaks}
+(increasing, left-closed cut points covering the true values, e.g.
+\code{c(0, .15, .25, .35, .46, 1)} for their Table III) to use your own.
 }
 \examples{
 g <- DoseGrid(levels = c(A = 2, B = 2))
