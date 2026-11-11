@@ -222,3 +222,48 @@ test_that("sweep plans are cached per grid and respect a lower state limit", {
   expect_error(upset_sweep_plan(full, max_states = 5), "max_states")
   expect_length(upset_sweep_plan(full)$steps, 18)
 })
+
+test_that("the compiled min-cut gives the same up-set as the plain R solver (#33)", {
+  keep <- array(TRUE, c(4, 3, 2))
+  keep[c(1, 8, 13, 24)] <- FALSE
+  grids <- list(DoseGrid(levels = 1L), DoseGrid(levels = 6L), DoseGrid(levels = c(5, 5)),
+                DoseGrid(levels = c(2, 7)), DoseGrid(levels = c(3, 3, 3)),
+                DoseGrid(levels = c(2, 2, 2, 2)), DoseGrid(levels = c(4, 3, 2), keep = keep))
+  set.seed(33)
+  for (g in grids) {
+    K <- n_combos(g)
+    for (i in 1:40) {
+      # every third draw: rounded gains with zeros, so exact ties are common
+      d <- if (i %% 3 == 0) sample(-2:2, K, replace = TRUE) else (rpois(K, 2) + 1) * rnorm(K)
+      for (largest in c(TRUE, FALSE)) {
+        gamma <- gPIPE:::solve_mincut(g, d, largest)
+        expect_type(gamma, "integer")
+        expect_identical(gamma, ref_mincut(g, d, largest))
+      }
+    }
+  }
+  # extreme gains, as from p clipped at 1e-12 with weights n + 1
+  g <- DoseGrid(levels = c(4, 4))
+  d <- c(rep(-27.6 * 60, 6), rep(0, 4), rep(27.6 * 60, 6))
+  expect_identical(gPIPE:::solve_mincut(g, d), ref_mincut(g, d))
+  expect_identical(gPIPE:::solve_mincut(g, as.integer(d)), ref_mincut(g, d))
+  # all gains zero: the tie rule alone decides
+  expect_identical(gPIPE:::solve_mincut(g, rep(0, 16)), rep(1L, 16))
+  expect_identical(gPIPE:::solve_mincut(g, rep(0, 16), largest = FALSE), rep(0L, 16))
+  # one combination, no edges
+  g1 <- DoseGrid(levels = 1L)
+  for (d in c(0.5, -0.5, 0)) {
+    expect_identical(gPIPE:::solve_mincut(g1, d), ref_mincut(g1, d))
+  }
+})
+
+test_that("the compiled min-cut stops on bad input", {
+  g <- DoseGrid(levels = c(3, 3))
+  expect_error(gPIPE:::solve_mincut(g, c(NaN, rep(1, 8))), "finite")
+  expect_error(gPIPE:::solve_mincut(g, c(NA, rep(1, 8))), "finite")
+  expect_error(gPIPE:::solve_mincut(g, c(Inf, rep(1, 8))), "finite")
+  expect_error(gPIPE:::solve_mincut(g, c(1, 2)), "combination indices")
+  pl <- gPIPE:::grid_plain(g)
+  pl$upper <- pl$upper[-1]
+  expect_error(gPIPE:::solve_mincut(pl, rep(1, 9)), "same length")
+})
