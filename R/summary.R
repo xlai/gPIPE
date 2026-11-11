@@ -11,30 +11,41 @@
 #' *unfavourable* is at least `theta + band` (toxic). For `target = "MED"` the
 #' sides swap: favourable (effective) is a mean of at least `theta + band`.
 #' Combinations inside the band are *indifferent* and count for neither
-#' side. With `band = 0`, "above `theta`" means a parameter strictly above it.
+#' side. With `band = 0`, "above `theta`" means a parameter above it by more
+#' than a rounding error.
 #'
 #' The metrics (`@metrics`, with Monte Carlo standard errors) are:
-#' * `fdr`, `tpr` (Cheung et al. 2022): among the combinations the final
-#'   estimate declares favourable (`gamma` = 1 for MED, 0 for MTD), the
-#'   proportion that are unfavourable (0 when none is declared), and the
-#'   proportion of favourable combinations that are declared. Averaged over
-#'   trials; trials with no favourable combination are left out of `tpr`.
+#' * `fdr` (Cheung et al. 2022, eq. 7): the proportion of the final dose set
+#'   (the MED or MTD set) that is unfavourable, 0 when the set is empty.
+#'   Indifferent combinations count in the set's size but not as false.
+#' * `tpr` (eq. 8): the proportion of favourable combinations that the final
+#'   estimate declares favourable (`gamma` = 1 for MED, 0 for MTD). A
+#'   stopped trial declares nothing, so it counts 0 in `fdr` and `tpr`; with
+#'   many stops FDR is pulled down. Both are averaged over trials, and trials
+#'   with no favourable combination are left out of `tpr`.
 #' * `pcs` (Riviere et al. 2014, Wages): the proportion of trials whose single
 #'   pick is a true MTD, a combination with `|truth - theta| <= tol`. Trials
-#'   with no pick count as failures. Binary MTD designs only.
+#'   with no pick count as failures. Binary MTD designs only. It is `NA` when
+#'   no combination is that close to `theta`; a wider `tol` gives a "within
+#'   `tol` of the target" version.
 #' * `pct_patients_favourable`, `pct_patients_unfavourable`: the share of
-#'   patients treated at each kind of combination (an overdose rate for MTD).
+#'   patients treated at each kind of combination (an overdose rate for MTD),
+#'   averaged over trials. This is not the pooled share in `@by_combo`, and
+#'   the two differ when trials stop early.
 #' * `p_set_unfavourable`: the proportion of trials whose final dose set
 #'   contains an unfavourable combination.
 #' * `mean_recommended` (Mander & Sweeting 2015): the mean number of
 #'   combinations in the final set, counting 0 for a trial that stopped.
 #'
 #' `@bands` holds the Mander & Sweeting recommendation table: the final-set
-#' combinations pooled over trials, as a percentage by true-parameter band.
-#' The default bands are Table IV of that paper, by distance from `theta` in
-#' percentage points; give `breaks` (left-closed cut points on the true
-#' parameter, e.g. `c(0, .15, .25, .35, .46, 1)` for their Table III) to use
-#' your own.
+#' combinations pooled over trials, as a percentage by true-parameter band,
+#' with each trial that recommended nothing counted once as "None" in the
+#' denominator. The default bands follow Table IV of that paper, by distance
+#' from `theta` in percentage points (the paper's three bands, with the
+#' "more than 10" bands split by side). Only the recommendation percentages
+#' are given, not their experimentation percentages. Give `breaks`
+#' (increasing, left-closed cut points covering the true values, e.g.
+#' `c(0, .15, .25, .35, .46, 1)` for their Table III) to use your own.
 #'
 #' @param object A `PipeSimulation` from [simulate()].
 #' @param band Half-width of the indifference band. `NULL` uses `0.25 * theta`
@@ -71,9 +82,9 @@ PipeSummary := new_class(
 # `summary.PipeSimulation`). Favourable is a deliberate side, so a value
 # exactly at the edge of the band is on that side, within `tol`.
 classify_truth <- function(target, theta, truth, band, tol = 1e-9) {
-  above <- truth > theta
+  above <- truth > theta + tol
   if (band == 0) {
-    # No indifference zone: a parameter strictly above theta is "above".
+    # No indifference zone: a parameter above theta (beyond `tol`) is "above".
     fav <- if (target == "MTD") !above else above
     unfav <- !fav
   } else {
@@ -92,10 +103,13 @@ mc_row <- function(metric, x) {
              mc_se = if (length(x) > 1L) stats::sd(x) / sqrt(length(x)) else NA_real_)
 }
 
-ms_band_table <- function(counts, truth, theta, breaks) {
+# Mander & Sweeting's recommendation table. `counts` are the final-set
+# memberships pooled over trials; `n_none` is the number of trials that
+# recommended nothing, counted once as "None" in the denominator (Table IV).
+ms_band_table <- function(counts, truth, theta, breaks, n_none) {
   if (is.null(breaks)) {
-    d <- 100 * (truth - theta)
-    d[abs(d) < 1e-7] <- 0
+    # Rounded so that exactly 10 points below or above theta stays in "1-10".
+    d <- round(100 * (truth - theta), 6)
     lab <- c("more than 10 below", "1-10 below", "at theta", "1-10 above", "more than 10 above")
     idx <- ifelse(d == 0, 3L, ifelse(d < -10, 1L, ifelse(d < 0, 2L, ifelse(d > 10, 5L, 4L))))
     band <- factor(lab[idx], levels = lab)
@@ -103,10 +117,21 @@ ms_band_table <- function(counts, truth, theta, breaks) {
     band <- cut(truth, breaks, right = FALSE, include.lowest = TRUE)
   }
   n_combos <- as.vector(table(band))
-  total <- tapply(counts, band, sum)
+  total <- as.vector(tapply(counts, band, sum))
   total[is.na(total)] <- 0
-  data.frame(band = levels(band), n_combos = n_combos, recommended = as.vector(total),
-             pct_recommended = if (sum(total) > 0) 100 * as.vector(total) / sum(total) else NA_real_)
+  total <- c(total, n_none)
+  data.frame(band = c(levels(band), "None"), n_combos = c(n_combos, NA_integer_),
+             recommended = total, pct_recommended = 100 * total / sum(total))
+}
+
+check_breaks <- function(breaks, truth) {
+  if (!is.numeric(breaks) || length(breaks) < 2L || anyNA(breaks) || is.unsorted(breaks, strictly = TRUE)) {
+    stop("`breaks` must be at least two increasing numbers.", call. = FALSE)
+  }
+  if (min(breaks) > min(truth) || max(breaks) < max(truth)) {
+    stop("`breaks` must cover the true values, from ", format(min(truth)), " to ", format(max(truth)),
+         ".", call. = FALSE)
+  }
 }
 
 method(summary, PipeSimulation) <- function(object, band = NULL, tol = 1e-8, breaks = NULL, ...) {
@@ -118,18 +143,21 @@ method(summary, PipeSimulation) <- function(object, band = NULL, tol = 1e-8, bre
     stop("The simulation has no `truth` for every combination.", call. = FALSE)
   }
   if (is.null(band)) band <- if (des@target == "MTD") 0.25 * des@theta else 0
-  if (length(band) != 1L || band < 0) stop("`band` must be a single number, 0 or more.", call. = FALSE)
+  if (!is.numeric(band) || length(band) != 1L || is.na(band) || band < 0) {
+    stop("`band` must be a single number, 0 or more.", call. = FALSE)
+  }
+  if (!is.null(breaks)) check_breaks(breaks, truth)
   cls <- classify_truth(des@target, des@theta, truth, band)
   fav <- cls == "favourable"
   unfav <- cls == "unfavourable"
 
   stopped <- object@summary$stopped
   fin <- object@final_set
-  # Combinations declared favourable by the final estimate; none after a stop.
+  # FDR is over the final dose set (Cheung eq. 7); TPR over every combination
+  # the final estimate declares favourable (eq. 8). A stopped trial declares nothing.
+  fdr <- rowSums(fin[, unfav, drop = FALSE]) / pmax(1, rowSums(fin))
   declared <- if (des@target == "MED") object@gamma == 1 else object@gamma == 0
   declared[stopped, ] <- FALSE
-  n_decl <- rowSums(declared)
-  fdr <- rowSums(declared[, unfav, drop = FALSE]) / pmax(1, n_decl)
   tpr <- if (any(fav)) rowSums(declared[, fav, drop = FALSE]) / sum(fav) else rep(NA_real_, nsim)
 
   pcs <- NULL
@@ -165,7 +193,7 @@ method(summary, PipeSimulation) <- function(object, band = NULL, tol = 1e-8, bre
     trials = data.frame(nsim = nsim, mean_n = mean(object@summary$n_enrolled),
                         pct_stopped = 100 * mean(stopped)),
     metrics = metrics,
-    bands = ms_band_table(colSums(fin), truth, des@theta, breaks)
+    bands = ms_band_table(colSums(fin), truth, des@theta, breaks, sum(rowSums(fin) == 0))
   )
 }
 
