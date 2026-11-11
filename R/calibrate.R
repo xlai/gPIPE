@@ -52,19 +52,19 @@ with_seed <- function(seed, expr) {
 #'
 #' Chooses the largest asymmetry `eps` for which the false discovery rate
 #' stays at or below `alpha` over an ensemble of true scenarios (Cheung et al.
-#' 2022). The false discovery rate is Cheung's eq. 7 for the *favourable*
-#' call: the share of the final dose set (the MED set, or the MTD set) that
-#' is truly unfavourable, ineffective for MED or toxic for MTD. The
-#' true-positive rate (eq. 8, over the combinations the final estimate
-#' declares favourable) at that `eps` is reported alongside.
+#' 2022). The false discovery rate is Cheung's eq. 7: the share of the final
+#' dose set (minimal `gamma` = 1 combinations for MED, maximal `gamma` = 0
+#' combinations for MTD) whose true `gamma` is wrong for the target, that is
+#' 0 for MED and 1 for MTD. The true-positive rate (eq. 8) at that `eps` is
+#' reported alongside. Only the true `gamma` of each scenario matters; there
+#' is no separate notion of safe or toxic.
 #'
-#' Each scenario is a monotone configuration (see [calibration_scenarios()]).
-#' Combinations above `theta` are placed at `theta + band` and the rest at
-#' `theta - band` for binary outcomes. For normal outcomes the rest sit at
-#' `theta`, the least favourable null, and the others at `theta + band`.
-#' With the default `band_frac = 0.25` and `target = "MTD"` this is the decided MTD
-#' calibration: safe doses at 0.75 theta and toxic doses at 1.25 theta. Use
-#' `band = 0.5 * theta` for the sensitivity analysis.
+#' Each scenario is a monotone configuration of true `gamma` (see
+#' [calibration_scenarios()]). To generate data, combinations with `gamma` = 1
+#' are placed at `theta + band` and the rest at `theta - band` for binary
+#' outcomes. For normal outcomes the rest sit at `theta`, the least favourable
+#' null, and the others at `theta + band`. The band only sets how far apart the
+#' simulated truths are, so it also sets how hard the calibration is.
 #'
 #' The false discovery rate rises with `eps`, so `eps` is found by bisection
 #' on `[lower, upper]`, not by a grid. Every evaluation uses the same seeds
@@ -84,11 +84,10 @@ with_seed <- function(seed, expr) {
 #' @param n_scenarios Number of scenarios when `scenarios` is `NULL`.
 #' @param nsim Trials per scenario and evaluation.
 #' @param alpha Largest acceptable false discovery rate.
-#' @param band Distance of the true values from `theta`. `NULL` is
-#'   `band_frac * theta` for binary outcomes; required for normal outcomes, where
-#'   it is the true effect.
-#' @param band_frac Default `band` as a fraction of `theta`; 0.25 is the decided
-#'   calibration band and 0.5 the sensitivity analysis. Not used when `band` is given.
+#' @param band Distance of the true values from `theta`, on the scale of the
+#'   parameter. The default is 0.1 for binary outcomes, as in [summary()]
+#'   for a simulation; it is required for normal outcomes, where it is the
+#'   true effect.
 #' @param sd True standard deviation for normal outcomes; defaults to the
 #'   design's `sigma0`.
 #' @param lower,upper Bracket for `eps`, within (0, 1).
@@ -107,7 +106,7 @@ with_seed <- function(seed, expr) {
 #' cal
 #' @export
 calibrate_eps <- function(design, scenarios = NULL, n_scenarios = 20, nsim = 200, alpha = 0.05,
-                          band = NULL, band_frac = 0.25, sd = NULL, lower = 0.01, upper = 0.5, tol = 0.01,
+                          band = NULL, sd = NULL, lower = 0.01, upper = 0.5, tol = 0.01,
                           seed = 1) {
   if (!S7::S7_inherits(design, PipeDesign)) stop("`design` must be a PipeDesign.", call. = FALSE)
   restore_rng()
@@ -124,7 +123,7 @@ calibrate_eps <- function(design, scenarios = NULL, n_scenarios = 20, nsim = 200
   binary <- design@outcome == "binary"
   if (is.null(band)) {
     if (!binary) stop("Give `band`, the true effect, for normal outcomes.", call. = FALSE)
-    band <- band_frac * design@theta
+    band <- 0.1
   }
   if (length(band) != 1L || !(band > 0)) stop("`band` must be a single positive number.", call. = FALSE)
   if (is.null(scenarios)) scenarios <- calibration_scenarios(grid, n_scenarios, seed)

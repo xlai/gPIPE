@@ -78,9 +78,8 @@ test_that("calibrate_eps() rejects bad input", {
   expect_error(calibrate_eps(g22), "PipeDesign")
 })
 
-test_that("calibrate_eps() takes the default band from band_frac", {
+test_that("calibrate_eps() has a default band of 0.1 for binary outcomes, settable by the user", {
   des <- bin_design()
-  cal <- calibrate_eps(des, n_scenarios = 2, nsim = 5, alpha = 0.999, band_frac = 0.5, seed = 1)
-  expect_equal(cal@band, 0.15)
-  expect_equal(calibrate_eps(des, n_scenarios = 2, nsim = 5, alpha = 0.999, seed = 1)@band, 0.075)
+  expect_equal(calibrate_eps(des, n_scenarios = 2, nsim = 5, alpha = 0.999, seed = 1)@band, 0.1)
+  expect_equal(calibrate_eps(des, n_scenarios = 2, nsim = 5, alpha = 0.999, band = 0.15, seed = 1)@band, 0.15)
 })

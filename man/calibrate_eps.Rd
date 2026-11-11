@@ -11,7 +11,6 @@ calibrate_eps(
   nsim = 200,
   alpha = 0.05,
   band = NULL,
-  band_frac = 0.25,
   sd = NULL,
   lower = 0.01,
   upper = 0.5,
@@ -32,12 +31,10 @@ to draw \code{n_scenarios} with \code{\link[=calibration_scenarios]{calibration_
 
 \item{alpha}{Largest acceptable false discovery rate.}
 
-\item{band}{Distance of the true values from \code{theta}. \code{NULL} is
-\code{band_frac * theta} for binary outcomes; required for normal outcomes, where
-it is the true effect.}
-
-\item{band_frac}{Default \code{band} as a fraction of \code{theta}; 0.25 is the decided
-calibration band and 0.5 the sensitivity analysis. Not used when \code{band} is given.}
+\item{band}{Distance of the true values from \code{theta}, on the scale of the
+parameter. The default is 0.1 for binary outcomes, as in \code{\link[=summary]{summary()}}
+for a simulation; it is required for normal outcomes, where it is the
+true effect.}
 
 \item{sd}{True standard deviation for normal outcomes; defaults to the
 design's \code{sigma0}.}
@@ -58,20 +55,20 @@ independent), \verb{@design} (the input design with \code{eps} set), \verb{@trac
 \description{
 Chooses the largest asymmetry \code{eps} for which the false discovery rate
 stays at or below \code{alpha} over an ensemble of true scenarios (Cheung et al.
-2022). The false discovery rate is Cheung's eq. 7 for the \emph{favourable}
-call: the share of the final dose set (the MED set, or the MTD set) that
-is truly unfavourable, ineffective for MED or toxic for MTD. The
-true-positive rate (eq. 8, over the combinations the final estimate
-declares favourable) at that \code{eps} is reported alongside.
+2022). The false discovery rate is Cheung's eq. 7: the share of the final
+dose set (minimal \code{gamma} = 1 combinations for MED, maximal \code{gamma} = 0
+combinations for MTD) whose true \code{gamma} is wrong for the target, that is
+0 for MED and 1 for MTD. The true-positive rate (eq. 8) at that \code{eps} is
+reported alongside. Only the true \code{gamma} of each scenario matters; there
+is no separate notion of safe or toxic.
 }
 \details{
-Each scenario is a monotone configuration (see \code{\link[=calibration_scenarios]{calibration_scenarios()}}).
-Combinations above \code{theta} are placed at \code{theta + band} and the rest at
-\code{theta - band} for binary outcomes. For normal outcomes the rest sit at
-\code{theta}, the least favourable null, and the others at \code{theta + band}.
-With the default \code{band_frac = 0.25} and \code{target = "MTD"} this is the decided MTD
-calibration: safe doses at 0.75 theta and toxic doses at 1.25 theta. Use
-\code{band = 0.5 * theta} for the sensitivity analysis.
+Each scenario is a monotone configuration of true \code{gamma} (see
+\code{\link[=calibration_scenarios]{calibration_scenarios()}}). To generate data, combinations with \code{gamma} = 1
+are placed at \code{theta + band} and the rest at \code{theta - band} for binary
+outcomes. For normal outcomes the rest sit at \code{theta}, the least favourable
+null, and the others at \code{theta + band}. The band only sets how far apart the
+simulated truths are, so it also sets how hard the calibration is.
 
 The false discovery rate rises with \code{eps}, so \code{eps} is found by bisection
 on \verb{[lower, upper]}, not by a grid. Every evaluation uses the same seeds
