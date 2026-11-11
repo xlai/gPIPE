@@ -7,6 +7,10 @@
 #' drugs as a bar per combination. For a `PipeCalibration` it plots FDR and TPR
 #' against `eps`, with the target `alpha` and the chosen `eps` marked.
 #'
+#' The "% of trials selecting" value is per combination, so the columns need
+#' not sum to 100: a trial can select several combinations, or none if it stops
+#' early or declares an empty set.
+#'
 #' These methods need the ggplot2 package (in Suggests) and return a ggplot
 #' object, which can be changed or saved in the usual way.
 #'
@@ -70,8 +74,10 @@ method(plot, PipeCalibration) <- function(x, ...) {
   tr <- x@trace
   long <- rbind(data.frame(eps = tr$eps, metric = "FDR", value = tr$fdr),
                 data.frame(eps = tr$eps, metric = "TPR", value = tr$tpr))
-  p <- ggplot2::ggplot(long, ggplot2::aes(x = .data$eps, y = .data$value, colour = .data$metric)) +
-    ggplot2::geom_line() +
+  long <- long[is.finite(long$value), , drop = FALSE]
+  p <- ggplot2::ggplot(long, ggplot2::aes(x = .data$eps, y = .data$value, colour = .data$metric))
+  if (any(table(long$metric) > 1L)) p <- p + ggplot2::geom_line()
+  p <- p +
     ggplot2::geom_point() +
     ggplot2::geom_hline(yintercept = x@alpha, linetype = "dashed") +
     ggplot2::theme_minimal() +
