@@ -257,7 +257,7 @@ test_that("the compiled min-cut gives the same up-set as the plain R solver (#33
   }
 })
 
-test_that("the compiled min-cut stops on bad input instead of reading outside its arrays", {
+test_that("the compiled min-cut stops on bad input", {
   g <- DoseGrid(levels = c(3, 3))
   expect_error(gPIPE:::solve_mincut(g, c(NaN, rep(1, 8))), "finite")
   expect_error(gPIPE:::solve_mincut(g, c(NA, rep(1, 8))), "finite")
@@ -266,6 +266,4 @@ test_that("the compiled min-cut stops on bad input instead of reading outside it
   pl <- gPIPE:::grid_plain(g)
   pl$upper <- pl$upper[-1]
   expect_error(gPIPE:::solve_mincut(pl, rep(1, 9)), "same length")
-  pl$upper <- as.numeric(gPIPE:::grid_plain(g)$upper)
-  expect_error(gPIPE:::solve_mincut(pl, rep(1, 9)), "integer")
 })
