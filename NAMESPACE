@@ -2,6 +2,8 @@
 
 export(DoseGrid)
 export(PipeDesign)
+export(calibrate_eps)
+export(calibration_scenarios)
 export(cheung_design)
 export(combo_index)
 export(combo_labels)
