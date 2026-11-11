@@ -20,6 +20,7 @@ Imports:
     S7,
     stats
 Suggests: 
+    ggplot2,
     jsonlite,
     testthat (>= 3.0.0),
     knitr,
@@ -41,6 +42,7 @@ Collate:
     'api.R'
     'summary.R'
     'calibrate.R'
+    'plot.R'
     'zzz.R'
 URL: https://github.com/xlai/gPIPE
 BugReports: https://github.com/xlai/gPIPE/issues

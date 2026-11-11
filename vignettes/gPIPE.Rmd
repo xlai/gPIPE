@@ -109,6 +109,43 @@ sim_med
 The final MED set is the minimal effective combinations of the final estimate,
 which uses `eps` itself.
 
+## Summaries and plots
+
+`summary()` turns a simulation into the tables papers report. Each metric
+follows the definition of its source paper: FDR and TPR (Cheung et al.),
+the proportion of trials that pick a true MTD (Riviere et al.), and the
+recommendation table by true-parameter band (Mander & Sweeting). Combinations
+within `band` of `theta` count as indifferent; the default band for MTD is
+0.25 theta.
+
+```{r}
+summary(sim)
+```
+
+`plot()` shows the percentage of trials selecting each combination, or the
+mean number of patients treated. It needs ggplot2.
+
+```{r, eval = requireNamespace("ggplot2", quietly = TRUE), fig.width = 4, fig.height = 3.5}
+plot(sim)
+```
+
+## Calibrating epsilon
+
+`calibrate_eps()` finds the largest `eps` whose false discovery rate stays
+within `alpha`, over an ensemble of monotone true scenarios. It searches by
+bisection and reuses the same random numbers at every `eps`. The example is
+kept small; use many more trials and scenarios in practice.
+
+```{r}
+g3 <- DoseGrid(levels = c(A = 3, B = 3))
+des <- cheung_design(g3, theta = 0.3, eps = 0.5, target = "MTD", outcome = "binary",
+                     prior_a = 0.3, prior_b = 0.7, N = 20)
+cal <- calibrate_eps(des, n_scenarios = 3, nsim = 10, tol = 0.1, seed = 1)
+cal
+```
+
+The calibrated design is `cal@design`.
+
 ## References
 
 - Mander, A. P. and Sweeting, M. J. (2015). A product of independent beta
