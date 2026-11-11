@@ -89,10 +89,53 @@ cell_exceedance <- function(theta, sigma0) {
   }
 }
 
+# Cheung's eq. (5) by quadrature over sigma, per combination: the sigma marginal is
+#   f(sigma) ~ tau_hat * phi(mu_hat / tau0) * sigma^-expo * L(mu_hat, sigma),   lo < sigma < hi,
+# p = sum Phi((mu_hat - theta) / tau_hat) f / sum f, on a log-spaced grid. mu ~ N(0, tau0^2).
+# The bounds and `expo` are not published; the rules in `QUAD_RULES` are fitted to the
+# Table 1 p_jk, not to Table 2. Untried cells get 0.5. Cells are cached by their data.
+QUAD_RULES <- list(
+  quad_a = list(lo = 1e-4, hi = 1, expo = 1),
+  quad_b = list(lo = 8e-4, hi = 0.55, expo = 1),
+  quad_c = list(lo = 0.005, hi = 100, expo = 1.5)
+)
+quad_exceedance <- function(theta, rule, tau0 = 10, m = 600L) {
+  grid <- exp(seq(log(rule$lo), log(rule$hi), length.out = m))
+  cache <- new.env()
+  cache$n <- cache$s1 <- cache$s2 <- cache$p <- NULL
+  cell <- function(nk, s1, s2) {
+    ybar <- s1 / nk
+    ss <- max(s2 - s1^2 / nk, 0)
+    tau2 <- 1 / (1 / tau0^2 + nk / grid^2)
+    mu <- tau2 * nk * ybar / grid^2
+    tau <- sqrt(tau2)
+    log_l <- -nk * log(grid) - (ss + nk * (ybar - mu)^2) / (2 * grid^2)
+    # (1 - expo) * log(grid): the prior sigma^-expo times sigma, from d sigma = sigma d log sigma
+    lf <- log(tau) - 0.5 * (mu / tau0)^2 + (1 - rule$expo) * log(grid) + log_l
+    w <- exp(lf - max(lf))
+    sum(stats::pnorm((mu - theta) / tau) * w) / sum(w)
+  }
+  function(n, s1, s2) {
+    if (is.null(cache$p)) {
+      cache$n <- cache$s1 <- cache$s2 <- numeric(length(n))
+      cache$p <- rep(0.5, length(n))
+    }
+    new <- which(n > 0 & (n != cache$n | s1 != cache$s1 | s2 != cache$s2))
+    for (k in new) cache$p[k] <- cell(n[k], s1[k], s2[k])
+    cache$n[new] <- n[new]
+    cache$s1[new] <- s1[new]
+    cache$s2[new] <- s2[new]
+    out <- cache$p
+    out[n == 0] <- 0.5
+    out
+  }
+}
+
 # The plain design list the trial loop runs on, with the chosen posterior.
 design_with <- function(des, posterior) {
   d <- gPIPE:::design_list(des)
   if (posterior == "cell") d$model$exceedance <- cell_exceedance(des@theta, SD_TRUE)
+  if (posterior %in% names(QUAD_RULES)) d$model$exceedance <- quad_exceedance(des@theta, QUAD_RULES[[posterior]])
   d
 }
 
@@ -151,7 +194,7 @@ out_dir <- file.path(here, "results")
 dir.create(out_dir, showWarnings = FALSE)
 
 posterior <- if (length(args) > 2) args[3] else "pooled"
-stopifnot(posterior %in% c("pooled", "cell"))
+stopifnot(posterior %in% c("pooled", "cell", names(QUAD_RULES)))
 suffix <- if (posterior == "pooled") "" else paste0("_", posterior)
 save_scen <- function(x) {
   utils::write.csv(x, file.path(out_dir, paste0("cheung_table2_scenarios", suffix, ".csv")), row.names = FALSE)
@@ -189,6 +232,32 @@ if (stage == "main") {
   utils::write.csv(cheung_table2_report(res), file.path(out_dir, paste0("cheung_table2_cells", suffix, ".csv")),
                    row.names = FALSE)
   show(res)
+}
+
+# Posterior rules (Table 1 fitted): 1-EQ at eps 0.05 and 2-PP at 0.0525, 100 trials per scenario.
+#   Rscript inst/simulations/cheung-table2.R posterior [reps]
+if (stage == "posterior") {
+  reps <- if (length(args) > 1) as.integer(args[2]) else 100L
+  scenarios <- cheung_upsets()
+  designs <- cheung_designs()
+  pub <- cheung_table2_published
+  out <- list()
+  for (nm in c("1-EQ", "2-PP")) {
+    for (rule in names(QUAD_RULES)) {
+      t0 <- Sys.time()
+      rows <- parallel::mclapply(seq_along(scenarios), function(i) {
+        run_adaptive(designs[[nm]], pub$eps[pub$design == nm], nm, scenarios, i, reps,
+                     seed0 = 100000L * match(nm, names(designs)), posterior = rule)
+      }, mc.cores = cores())
+      res <- do.call(rbind, rows)
+      cells <- cheung_table2_report(res, reps_cheung = 40)
+      cells$rule <- rule
+      out[[length(out) + 1L]] <- cells
+      cat(sprintf("%s %s done (%.0f s)\n", nm, rule, as.numeric(difftime(Sys.time(), t0, units = "secs"))))
+      print(cells[, c("design", "metric", "published", "gpipe", "se_gpipe", "z", "pass")], digits = 3)
+      utils::write.csv(do.call(rbind, out), file.path(out_dir, "cheung_table2_posterior_rules.csv"), row.names = FALSE)
+    }
+  }
 }
 
 # Soft check: the epsilon that keeps FDR <= 0.05 (reported, not a gate).
