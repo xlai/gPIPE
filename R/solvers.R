@@ -27,8 +27,9 @@
 # not the total, so that weights n + 1 on a large grid do not turn small real
 # gains into ties.
 #
-# The max flow runs in C++ through Rcpp (src/mincut.cpp). The same algorithm in plain R is
-# kept in tests/testthat/helper-mincut.R, and the tests compare the two.
+# The max flow runs in C++ through Rcpp (src/mincut.cpp). The same algorithm
+# in plain R is kept in tests/testthat/helper-mincut.R, and the tests compare
+# the two.
 solve_mincut <- function(grid, d, largest = TRUE) {
   grid <- grid_plain(grid)
   tol <- 1e-10 * (1 + max(abs(d)))

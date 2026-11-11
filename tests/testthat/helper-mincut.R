@@ -1,5 +1,5 @@
 # The min-cut of solve_mincut() in plain R. This was the package's solver
-# before the max flow moved to C (src/mincut.c); the tests compare the two.
+# before the max flow moved to C++ (src/mincut.cpp); the tests compare the two.
 ref_mincut <- function(grid, d, largest = TRUE) {
   grid <- grid_plain(grid)
   K <- grid$K
