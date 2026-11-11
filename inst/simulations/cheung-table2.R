@@ -141,7 +141,7 @@ run_nonadaptive <- function(scenarios, reps, eps, seed0, grid = cheung_grid(), p
 cores <- function() max(1L, as.integer(Sys.getenv("GPIPE_CORES", parallel::detectCores())))
 
 args <- commandArgs(TRUE)
-stage <- if (length(args)) args[1] else "main"
+stage <- if (isTRUE(getOption("gpipe.sim.source_only"))) "none" else if (length(args)) args[1] else "main"
 out_dir <- file.path(here, "results")
 dir.create(out_dir, showWarnings = FALSE)
 
@@ -188,7 +188,7 @@ if (stage == "main") {
 
 # Soft check: the epsilon that keeps FDR <= 0.05 (reported, not a gate).
 #  - non-adaptive: FDR and TPR on Cheung's grid 0.01, 0.0125, ..., 0.10, both posteriors;
-#  - adaptive: calibrate_eps() on the 252 scenarios (pooled posterior), 100 trials per scenario.
+#  - adaptive: calibrate_eps() on the 252 scenarios (pooled posterior), 40 trials per scenario (as Cheung).
 if (stage == "calib") {
   scenarios <- cheung_upsets()
   grid_eps <- seq(0.01, 0.10, by = 0.0025)
@@ -205,7 +205,7 @@ if (stage == "calib") {
   }
   designs <- cheung_designs()
   cal <- parallel::mclapply(names(designs), function(nm) {
-    r <- calibrate_eps(designs[[nm]], scenarios = scenarios, nsim = 100, band = MU_EFFECTIVE, sd = SD_TRUE,
+    r <- calibrate_eps(designs[[nm]], scenarios = scenarios, nsim = 40, band = MU_EFFECTIVE, sd = SD_TRUE,
                        lower = 0.01, upper = 0.10, tol = 0.0025, seed = 7)
     data.frame(design = nm, eps = r@eps, fdr = r@fdr, fdr_se = r@fdr_se, tpr = r@tpr,
                printed_eps = cheung_table2_published$eps[cheung_table2_published$design == nm])
