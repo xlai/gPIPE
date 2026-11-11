@@ -15,7 +15,8 @@
 # cover outside U, or with no lower cover at all (the bottom dose). S0: doses
 # outside U with an upper cover in U. When U is empty, the top dose(s).
 cheung_candidates <- function(grid, gamma) {
-  e <- grid@edges
+  grid <- grid_plain(grid)
+  e <- grid$edges
   K <- n_combos(grid)
   if (!any(gamma == 1)) {
     return(setdiff(seq_len(K), e[, "lower"]))
@@ -32,7 +33,7 @@ cheung_candidates <- function(grid, gamma) {
 # Dose set reported at the end of an epsilon-tapering trial: for MTD the
 # maximal safe doses, for MED the minimal effective doses.
 pipe_final_set <- function(grid, gamma, target = c("MTD", "MED")) {
-  target <- match.arg(target)
+  target <- arg_one(target, c("MTD", "MED"))
   if (target == "MTD") maximal_elements(grid, gamma == 0) else minimal_elements(grid, gamma == 1)
 }
 
@@ -63,16 +64,17 @@ riviere_pick <- function(set, theta, a, b, n, x, delta = 0.1, within_set = TRUE)
 #   every drug (M&S Sec. 2.4.2).
 ms_constraint <- function(grid, history, constraint = c("neighbouring", "non-neighbouring"),
                           start = 1L) {
-  constraint <- match.arg(constraint)
+  constraint <- arg_one(constraint, c("neighbouring", "non-neighbouring"))
+  grid <- grid_plain(grid)
   if (!length(history)) {
     return(as.integer(start))
   }
   if (constraint == "neighbouring") {
     return(grid_neighbourhood(grid, history[length(history)]))
   }
-  given <- grid@combos[unique(history), , drop = FALSE]
+  given <- grid$combos[unique(history), , drop = FALSE]
   ok <- vapply(seq_len(n_combos(grid)), function(k) {
-    any(colSums(t(given) + 1L >= grid@combos[k, ]) == ncol(given))
+    any(colSums(t(given) + 1L >= grid$combos[k, ]) == ncol(given))
   }, logical(1))
   which(ok)
 }
@@ -82,7 +84,8 @@ ms_constraint <- function(grid, history, constraint = c("neighbouring", "non-nei
 # no lower cover is toxic and in A; a safe dose in A if no upper cover is safe
 # and in A.
 ms_closest <- function(grid, gamma, A) {
-  e <- grid@edges
+  grid <- grid_plain(grid)
+  e <- grid$edges
   tox <- A & gamma == 1
   safe <- A & gamma == 0
   blocked_tox <- e[tox[e[, "upper"]] & tox[e[, "lower"]], "upper"]
@@ -95,18 +98,19 @@ ms_closest <- function(grid, gamma, A) {
 # Off-grid counts as safe below and toxic above; combinations left out of the
 # grid count as neither.
 ms_adjacent <- function(grid, gamma) {
-  D <- length(grid@levels)
+  grid <- grid_plain(grid)
+  D <- length(grid$levels)
   shifts <- as.matrix(expand.grid(rep(list(0:1), D)))[-1, , drop = FALSE]
   low_safe <- up_tox <- logical(n_combos(grid))
   state_at <- function(pos) {
-    off <- rowSums(pos < 1L | sweep(pos, 2, grid@levels, `>`)) > 0
+    off <- rowSums(pos < 1L | sweep(pos, 2, grid$levels, `>`)) > 0
     idx <- rep(NA_integer_, nrow(pos))
-    idx[!off] <- grid@lookup[pos[!off, , drop = FALSE]]
+    idx[!off] <- grid$lookup[pos[!off, , drop = FALSE]]
     list(off = off, gamma = gamma[idx])
   }
   for (s in seq_len(nrow(shifts))) {
-    below <- state_at(sweep(grid@combos, 2, shifts[s, ]))
-    above <- state_at(sweep(grid@combos, 2, shifts[s, ], `+`))
+    below <- state_at(sweep(grid$combos, 2, shifts[s, ]))
+    above <- state_at(sweep(grid$combos, 2, shifts[s, ], `+`))
     low_safe <- low_safe | below$off | (!is.na(below$gamma) & below$gamma == 0)
     up_tox <- up_tox | above$off | (!is.na(above$gamma) & above$gamma == 1)
   }
@@ -121,7 +125,7 @@ ms_adjacent <- function(grid, gamma) {
 #   "inverse_sqrt_S": proportional to 1/sqrt(S), kept for back-compatibility.
 ms_selection_weights <- function(candidates, S,
                                  selection = c("min_S", "inverse_S", "equal", "inverse_sqrt_S")) {
-  selection <- match.arg(selection)
+  selection <- arg_one(selection, c("min_S", "inverse_S", "equal", "inverse_sqrt_S"))
   prob <- numeric(length(S))
   s <- S[candidates]
   prob[candidates] <- switch(selection,
@@ -148,8 +152,9 @@ ms_selection_weights <- function(candidates, S,
 ms_decide <- function(grid, p, n, S, history, admis = c("closest", "adjacent"),
                       constraint = "neighbouring", safety = 0.8, selection = "inverse_S",
                       start = 1L, final = FALSE) {
-  admis <- match.arg(admis)
-  K <- n_combos(grid)
+  admis <- arg_one(admis, c("closest", "adjacent"))
+  grid <- grid_plain(grid)
+  K <- grid$K
   if (length(p) != K || length(n) != K || length(S) != K) {
     stop("`p`, `n` and `S` must have one entry per combination.", call. = FALSE)
   }

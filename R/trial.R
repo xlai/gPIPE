@@ -1,7 +1,9 @@
 # Trial loop and simulation (#18, step 5).
 #
 # The loop runs on plain vectors: a design is a list read once at the start,
-# and the data are integer and numeric vectors over the combinations. Two
+# with the grid also kept as a plain list (`g`, from grid_plain(), so no S7
+# property is read inside a trial), and the data are integer and numeric vectors over the
+# combinations. Two
 # rules choose the next dose:
 #
 # - "cheung": Cheung et al. (2022) Algorithm 1 with optional eps-tapering.
@@ -37,6 +39,8 @@ pipe_trial_design <- function(grid, model, target = c("MTD", "MED"), N, cohort =
                               within_set = TRUE) {
   target <- match.arg(target)
   rule <- match.arg(rule)
+  g <- grid_plain(grid)
+  g$key <- grid_key(g)
   if (rule == "ms" && model$family != "binary") {
     stop("The M&S rule needs a binary outcome model.", call. = FALSE)
   }
@@ -50,13 +54,12 @@ pipe_trial_design <- function(grid, model, target = c("MTD", "MED"), N, cohort =
   if (rule == "ms" && !is.null(safety)) {
     # Build the sweep plan now, so a grid too wide for the safety rule fails
     # here and not in the middle of a trial.
-    upset_sweep_plan(grid)
+    upset_sweep_plan(g)
   }
   if (is.null(start)) {
-    K <- n_combos(grid)
-    start <- if (rule == "cheung" && target == "MED") max(maximal_elements(grid, rep(TRUE, K))) else 1L
+    start <- if (rule == "cheung" && target == "MED") max(maximal_elements(g, rep(TRUE, g$K))) else 1L
   }
-  if (length(start) != 1L || !(start %in% seq_len(n_combos(grid)))) {
+  if (length(start) != 1L || !(start %in% seq_len(g$K))) {
     stop("`start` must be a combination index of the grid.", call. = FALSE)
   }
   if (!(N >= 1 && cohort >= 1)) {
@@ -70,7 +73,7 @@ pipe_trial_design <- function(grid, model, target = c("MTD", "MED"), N, cohort =
   } else {
     selection <- match.arg(selection, c("min_S", "inverse_S", "equal", "inverse_sqrt_S"))
   }
-  list(grid = grid, model = model, target = target, N = as.integer(N),
+  list(grid = grid, g = g, model = model, target = target, N = as.integer(N),
        cohort = as.integer(cohort), start = as.integer(start), rule = rule, eps = eps,
        taper = isTRUE(taper), weights = weights, selection = selection, admis = admis,
        constraint = constraint, safety = safety, delta = delta, within_set = within_set)
@@ -87,7 +90,7 @@ pipe_trial_design <- function(grid, model, target = c("MTD", "MED"), N, cohort =
 #   pick:           single dose by Riviere's rule (binary MTD only, else NA).
 pipe_trial <- function(design, truth) {
   model <- design$model
-  K <- n_combos(design$grid)
+  K <- design$g$K
   N <- design$N
   n <- integer(K)
   s1 <- s2 <- numeric(K)
@@ -118,19 +121,19 @@ pipe_trial <- function(design, truth) {
 # doses given, in order). `stopped` is TRUE when the M&S safety rule leaves no
 # admissible dose.
 trial_step <- function(design, n, s1, s2, history) {
-  K <- n_combos(design$grid)
+  K <- design$g$K
   p <- design$model$exceedance(n, s1, s2)
   prob <- numeric(K)
   if (design$rule == "cheung") {
     eps_n <- if (design$taper) taper_eps(sum(n), design$N, design$eps) else design$eps
     gamma <- trial_estimate(design, p, n, eps_n)
-    cand <- cheung_candidates(design$grid, gamma)
+    cand <- cheung_candidates(design$g, gamma)
     fav <- if (design$target == "MED") p[cand] else 1 - p[cand]
     prob[cand] <- if (design$selection == "equal" || !any(fav > 0)) 1 else fav
     return(list(p = p, gamma = gamma, prob = prob / sum(prob), stopped = FALSE))
   }
   model <- design$model
-  dec <- ms_decide(design$grid, p, n, S = model$a + model$b + n, history = history,
+  dec <- ms_decide(design$g, p, n, S = model$a + model$b + n, history = history,
                    admis = design$admis, constraint = design$constraint,
                    safety = design$safety, selection = design$selection, start = design$start)
   list(p = p, gamma = dec$mode, q = dec$q, prob = if (dec$stopped) prob else dec$prob,
@@ -141,7 +144,7 @@ trial_step <- function(design, n, s1, s2, history) {
 # set (MTD/MED set for "cheung", RP2D for "ms", empty when stopped), Riviere's
 # pick (binary MTD only, else NA) and, for "ms", q.
 trial_final <- function(design, n, s1, s2, history, stopped = FALSE) {
-  grid <- design$grid
+  grid <- design$g
   model <- design$model
   p <- model$exceedance(n, s1, s2)
   q <- NULL
@@ -166,7 +169,7 @@ trial_final <- function(design, n, s1, s2, history, stopped = FALSE) {
 
 trial_estimate <- function(design, p, n, eps) {
   w <- pipe_weights(n, design$weights)
-  pipe_estimate(design$grid, pipe_gain(p, eps, w, design$target), design$target)
+  pipe_estimate(design$g, pipe_gain(p, eps, w, design$target), design$target)
 }
 
 # One draw from `x` with weights `prob` (safe when only one entry is left;
@@ -185,7 +188,7 @@ draw_dose <- function(x, prob) {
 # stopped and pick per trial.
 pipe_simulate <- function(design, truth, n_trials, seed = NULL, keep_trials = TRUE) {
   if (!is.null(seed)) set.seed(seed)
-  K <- n_combos(design$grid)
+  K <- design$g$K
   trials <- lapply(seq_len(n_trials), function(i) pipe_trial(design, truth))
   by_combo <- function(f) matrix(unlist(lapply(trials, f)), n_trials, K, byrow = TRUE)
   list(

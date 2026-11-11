@@ -4,6 +4,7 @@
 * CI: R CMD check on R-devel (non-blocking, weekly), release and oldrel-1 for `main` and `dev`; Codecov coverage reporting; lintr on changed files (#16).
 * New S7 class `DoseGrid` for dose combinations of any number of drugs, with helpers to convert between the array and vector views (#18).
 * New S7 API (#18): `PipeDesign`, with the `ms_design()` (Mander & Sweeting 2015) and `cheung_design()` (Cheung et al. 2022) constructors; `estimate()`, `next_dose()` and a `simulate()` method. One exact estimator (a minimum cut) is used for any number of drugs. The Mander & Sweeting safety probabilities are computed exactly without listing the monotone contours, so the safety rule also works for three drugs (#31).
+* Faster simulation: the trial loop reads the grid from a plain list made once per design, and no longer runs `match.arg()` at every step. Results are unchanged (#31).
 * Fixed: per-dose priors no longer give `NA` posteriors; trials no longer stop silently when no border dose is in the neighbourhood; the taper reaches `eps` at the last patient.
 * Golden tests against pipe.design 0.5.1 decision snapshots and Cheung et al. (2022) Table 1, run per implementation so each refactor step enables its own tests (#17).
 
