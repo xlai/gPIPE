@@ -54,9 +54,11 @@ independent), \verb{@design} (the input design with \code{eps} set), \verb{@trac
 \description{
 Chooses the largest asymmetry \code{eps} for which the false discovery rate
 stays at or below \code{alpha} over an ensemble of true scenarios (Cheung et al.
-2022). The false discovery rate is for the \emph{favourable} call: the
-combinations the final estimate declares effective (MED) or safe (MTD).
-The true-positive rate at that \code{eps} is reported alongside.
+2022). The false discovery rate is Cheung's eq. 7 for the \emph{favourable}
+call: the share of the final dose set (the MED set, or the MTD set) that
+is truly unfavourable, ineffective for MED or toxic for MTD. The
+true-positive rate (eq. 8, over the combinations the final estimate
+declares favourable) at that \code{eps} is reported alongside.
 }
 \details{
 Each scenario is a monotone configuration (see \code{\link[=calibration_scenarios]{calibration_scenarios()}}).

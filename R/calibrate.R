@@ -52,9 +52,11 @@ with_seed <- function(seed, expr) {
 #'
 #' Chooses the largest asymmetry `eps` for which the false discovery rate
 #' stays at or below `alpha` over an ensemble of true scenarios (Cheung et al.
-#' 2022). The false discovery rate is for the *favourable* call: the
-#' combinations the final estimate declares effective (MED) or safe (MTD).
-#' The true-positive rate at that `eps` is reported alongside.
+#' 2022). The false discovery rate is Cheung's eq. 7 for the *favourable*
+#' call: the share of the final dose set (the MED set, or the MTD set) that
+#' is truly unfavourable, ineffective for MED or toxic for MTD. The
+#' true-positive rate (eq. 8, over the combinations the final estimate
+#' declares favourable) at that `eps` is reported alongside.
 #'
 #' Each scenario is a monotone configuration (see [calibration_scenarios()]).
 #' Combinations above `theta` are placed at `theta + band` and the rest at
@@ -153,7 +155,7 @@ calibrate_eps <- function(design, scenarios = NULL, n_scenarios = 20, nsim = 200
       declared[sim$summary$stopped, ] <- FALSE
       fav <- scenarios[[i]] != 1
       if (design@target == "MED") fav <- !fav
-      fdr <- rowSums(declared[, !fav, drop = FALSE]) / pmax(1, rowSums(declared))
+      fdr <- rowSums(sim$final_set[, !fav, drop = FALSE]) / pmax(1, rowSums(sim$final_set))
       tpr <- if (any(fav)) rowSums(declared[, fav, drop = FALSE]) / sum(fav) else rep(NA_real_, nsim)
       list(fdr = fdr, tpr = tpr)
     })
