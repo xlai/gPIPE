@@ -11,6 +11,7 @@ calibrate_eps(
   nsim = 200,
   alpha = 0.05,
   band = NULL,
+  band_frac = 0.25,
   sd = NULL,
   lower = 0.01,
   upper = 0.5,
@@ -32,8 +33,11 @@ to draw \code{n_scenarios} with \code{\link[=calibration_scenarios]{calibration_
 \item{alpha}{Largest acceptable false discovery rate.}
 
 \item{band}{Distance of the true values from \code{theta}. \code{NULL} is
-\code{0.25 * theta} for binary outcomes; required for normal outcomes, where
+\code{band_frac * theta} for binary outcomes; required for normal outcomes, where
 it is the true effect.}
+
+\item{band_frac}{Default \code{band} as a fraction of \code{theta}; 0.25 is the decided
+calibration band and 0.5 the sensitivity analysis. Not used when \code{band} is given.}
 
 \item{sd}{True standard deviation for normal outcomes; defaults to the
 design's \code{sigma0}.}
@@ -65,7 +69,7 @@ Each scenario is a monotone configuration (see \code{\link[=calibration_scenario
 Combinations above \code{theta} are placed at \code{theta + band} and the rest at
 \code{theta - band} for binary outcomes. For normal outcomes the rest sit at
 \code{theta}, the least favourable null, and the others at \code{theta + band}.
-With \code{band = 0.25 * theta} and \code{target = "MTD"} this is the decided MTD
+With the default \code{band_frac = 0.25} and \code{target = "MTD"} this is the decided MTD
 calibration: safe doses at 0.75 theta and toxic doses at 1.25 theta. Use
 \code{band = 0.5 * theta} for the sensitivity analysis.
 
