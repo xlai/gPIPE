@@ -6,13 +6,25 @@
 \arguments{
 \item{object}{A \code{PipeSimulation} from \code{\link[=simulate]{simulate()}}.}
 
-\item{band}{Half-width of the indifference band. \code{NULL} uses \code{0.25 * theta}
-for MTD (the calibration band) and \code{0} for MED.}
+\item{band}{Half-width of the indifference band. \code{NULL} uses
+\code{band_frac * theta} for MTD and \code{0} for MED.}
 
-\item{tol}{Tolerance for "true MTD" in \code{pcs}.}
+\item{band_frac}{Width of the default MTD band as a fraction of \code{theta}.
+The default 0.25 is the decided calibration band; 0.5 is the sensitivity
+analysis. Not used when \code{band} is given.}
+
+\item{mtd_tol}{Tolerance for "true MTD" in \code{pcs} only: a combination is a
+true MTD when \verb{|truth - theta| <= mtd_tol}. Separate from the bands; the
+default is a rounding tolerance, as in Riviere et al., whose true MTDs sit
+exactly at the target.}
+
+\item{table_band}{Half-width, on the probability scale, of the "within"
+bands of the default recommendation table. The default 0.1 is the 10
+percentage points of Mander & Sweeting's Table IV; the row labels follow
+it. Use \code{table_band = band} to tie the table to the indifference band.}
 
 \item{breaks}{Cut points for the recommendation table, or \code{NULL} for the
-Mander & Sweeting Table IV bands.}
+bands set by \code{table_band}.}
 
 \item{...}{Not used.}
 }
@@ -46,13 +58,14 @@ Indifferent combinations count in the set's size but not as false.
 \item \code{tpr} (eq. 8): the proportion of favourable combinations that the final
 estimate declares favourable (\code{gamma} = 1 for MED, 0 for MTD). A
 stopped trial declares nothing, so it counts 0 in \code{fdr} and \code{tpr}; with
-many stops FDR is pulled down. Both are averaged over trials, and trials
+many stops FDR is pulled down. FDR is 0 when no combination is
+unfavourable in the truth. Both are averaged over trials, and trials
 with no favourable combination are left out of \code{tpr}.
 \item \code{pcs} (Riviere et al. 2014, Wages): the proportion of trials whose single
-pick is a true MTD, a combination with \verb{|truth - theta| <= tol}. Trials
+pick is a true MTD, a combination with \verb{|truth - theta| <= mtd_tol}. Trials
 with no pick count as failures. Binary MTD designs only. It is \code{NA} when
-no combination is that close to \code{theta}; a wider \code{tol} gives a "within
-\code{tol} of the target" version.
+no combination is that close to \code{theta}; a wider \code{mtd_tol} gives a "within
+\code{mtd_tol} of the target" version.
 \item \code{pct_patients_favourable}, \code{pct_patients_unfavourable}: the share of
 patients treated at each kind of combination (an overdose rate for MTD),
 averaged over trials. This is not the pooled share in \verb{@by_combo}, and
@@ -67,8 +80,8 @@ combinations in the final set, counting 0 for a trial that stopped.
 combinations pooled over trials, as a percentage by true-parameter band,
 with each trial that recommended nothing counted once as "None" in the
 denominator. The default bands follow Table IV of that paper, by distance
-from \code{theta} in percentage points (the paper's three bands, with the
-"more than 10" bands split by side). Only the recommendation percentages
+from \code{theta} in percentage points, with the width set by \code{table_band}
+(the paper's three bands, with the outer bands split by side). Only the recommendation percentages
 are given, not their experimentation percentages. Give \code{breaks}
 (increasing, left-closed cut points covering the true values, e.g.
 \code{c(0, .15, .25, .35, .46, 1)} for their Table III) to use your own.
