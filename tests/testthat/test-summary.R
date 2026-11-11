@@ -49,7 +49,7 @@ test_that("summary() matches hand-computed tables for an MTD design", {
 test_that("the Mander & Sweeting recommendation table pools final sets by band", {
   s <- summary(hand_sim())
   # d = (-20, 0, 15, 30) points: more than 10 below, at theta, more than 10 above x2.
-  expect_equal(s@bands$band, c("more than 10 below", "1-10 below", "at theta", "1-10 above",
+  expect_equal(s@bands$band, c("more than 10 below", "within 10 below", "at theta", "within 10 above",
                                "more than 10 above", "None"))
   # Trial 4 recommended nothing and counts once as None.
   expect_equal(s@bands$recommended, c(2, 0, 2, 0, 1, 1))
@@ -91,7 +91,7 @@ test_that("simulate() stores the truth, from a vector, an array or a normal scen
 })
 
 test_that("band edges are robust to floating point", {
-  # Exactly 10 points from theta is in "1-10", not "more than 10".
+  # Exactly 10 points from theta is in "within 10", not "more than 10".
   b <- ms_band_table(c(1, 1, 1, 1), c(0.2, 0.4, 0.5, 0.3), 0.3, NULL, 0)
   expect_equal(b$recommended[1:5], c(0, 1, 1, 1, 1))
   b2 <- ms_band_table(c(1, 1), c(0.3 + 0.05, 0.1 + 0.2), 0.3, c(0, 0.35, 1), 0)
@@ -107,4 +107,35 @@ test_that("summary() checks `breaks` and `band`", {
   expect_error(summary(sim, breaks = 0.5), "two")
   expect_error(summary(sim, band = NA_real_), "band")
   expect_error(summary(sim, band = "a"), "band")
+})
+
+test_that("the band widths are arguments, not fixed numbers", {
+  sim <- hand_sim()  # theta 0.3, truth 0.1, 0.3, 0.45, 0.6
+  # band_frac sets the default MTD band: 0.5 * 0.3 = 0.15 puts 0.45 at the toxic edge.
+  expect_equal(summary(sim, band_frac = 0.5)@band, 0.15)
+  expect_equal(summary(sim, band = 0.2, band_frac = 0.5)@band, 0.2)
+  expect_equal(summary(sim)@band, 0.25 * 0.3)
+  # table_band sets the width and the labels of the default recommendation table.
+  s <- summary(sim, table_band = 0.05)
+  expect_equal(s@bands$band[c(1, 2, 4, 5)],
+               c("more than 5 below", "within 5 below", "within 5 above", "more than 5 above"))
+  # 0.1 is 0.2 below theta, 0.45 is 0.15 above, 0.6 is 0.3 above.
+  expect_equal(s@bands$recommended[c(1, 3, 5)], c(2, 2, 1))
+  s2 <- summary(sim, table_band = 0.2)
+  expect_equal(s2@bands$band[1], "more than 20 below")
+  expect_error(summary(sim, table_band = 0), "table_band")
+  # mtd_tol only changes pcs: truth 0.3 is a true MTD only within mtd_tol of theta.
+  pcs <- function(x) setNames(x@metrics$estimate, x@metrics$metric)[["pcs"]]
+  expect_equal(pcs(summary(sim)), 0.25)
+  # Picks are 2, 1, 3 and none; within 0.2 of theta are combinations 1, 2 and 3.
+  expect_equal(pcs(summary(sim, mtd_tol = 0.2)), 0.75)
+})
+
+test_that("FDR is 0 when no combination is unfavourable in the truth", {
+  sim <- hand_sim()
+  sim@truth <- rep(0.1, 4)  # all safe
+  s <- summary(sim)
+  m <- setNames(s@metrics$estimate, s@metrics$metric)
+  expect_equal(m[["fdr"]], 0)
+  expect_true(is.na(setNames(s@metrics$estimate, s@metrics$metric)[["p_set_unfavourable"]]))
 })

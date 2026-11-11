@@ -62,7 +62,7 @@ with_seed <- function(seed, expr) {
 #' Combinations above `theta` are placed at `theta + band` and the rest at
 #' `theta - band` for binary outcomes. For normal outcomes the rest sit at
 #' `theta`, the least favourable null, and the others at `theta + band`.
-#' With `band = 0.25 * theta` and `target = "MTD"` this is the decided MTD
+#' With the default `band_frac = 0.25` and `target = "MTD"` this is the decided MTD
 #' calibration: safe doses at 0.75 theta and toxic doses at 1.25 theta. Use
 #' `band = 0.5 * theta` for the sensitivity analysis.
 #'
@@ -85,8 +85,10 @@ with_seed <- function(seed, expr) {
 #' @param nsim Trials per scenario and evaluation.
 #' @param alpha Largest acceptable false discovery rate.
 #' @param band Distance of the true values from `theta`. `NULL` is
-#'   `0.25 * theta` for binary outcomes; required for normal outcomes, where
+#'   `band_frac * theta` for binary outcomes; required for normal outcomes, where
 #'   it is the true effect.
+#' @param band_frac Default `band` as a fraction of `theta`; 0.25 is the decided
+#'   calibration band and 0.5 the sensitivity analysis. Not used when `band` is given.
 #' @param sd True standard deviation for normal outcomes; defaults to the
 #'   design's `sigma0`.
 #' @param lower,upper Bracket for `eps`, within (0, 1).
@@ -105,7 +107,7 @@ with_seed <- function(seed, expr) {
 #' cal
 #' @export
 calibrate_eps <- function(design, scenarios = NULL, n_scenarios = 20, nsim = 200, alpha = 0.05,
-                          band = NULL, sd = NULL, lower = 0.01, upper = 0.5, tol = 0.01,
+                          band = NULL, band_frac = 0.25, sd = NULL, lower = 0.01, upper = 0.5, tol = 0.01,
                           seed = 1) {
   if (!S7::S7_inherits(design, PipeDesign)) stop("`design` must be a PipeDesign.", call. = FALSE)
   restore_rng()
@@ -122,7 +124,7 @@ calibrate_eps <- function(design, scenarios = NULL, n_scenarios = 20, nsim = 200
   binary <- design@outcome == "binary"
   if (is.null(band)) {
     if (!binary) stop("Give `band`, the true effect, for normal outcomes.", call. = FALSE)
-    band <- 0.25 * design@theta
+    band <- band_frac * design@theta
   }
   if (length(band) != 1L || !(band > 0)) stop("`band` must be a single positive number.", call. = FALSE)
   if (is.null(scenarios)) scenarios <- calibration_scenarios(grid, n_scenarios, seed)
