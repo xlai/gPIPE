@@ -6,33 +6,26 @@
 \arguments{
 \item{object}{A \code{PipeSimulation} from \code{\link[=simulate]{simulate()}}.}
 
-\item{band}{Half-width of the indifference band. \code{NULL} uses
-\code{band_frac * theta} for MTD and \code{0} for MED.}
-
-\item{band_frac}{Width of the default MTD band as a fraction of \code{theta}.
-The default 0.25 is the decided calibration band; 0.5 is the sensitivity
-analysis. Not used when \code{band} is given.}
+\item{band}{Half-width of the indifference interval and of the recommendation
+table, on the scale of the parameter. The default is 0.1, the 10
+percentage points of Mander & Sweeting, for binary outcomes, and 0 for
+normal outcomes, whose scale is not a probability.}
 
 \item{mtd_tol}{Tolerance for "true MTD" in \code{pcs} only: a combination is a
-true MTD when \verb{|truth - theta| <= mtd_tol}. Separate from the bands; the
+true MTD when \verb{|truth - theta| <= mtd_tol}. Separate from \code{band}; the
 default is a rounding tolerance, as in Riviere et al., whose true MTDs sit
 exactly at the target.}
 
-\item{table_band}{Half-width, on the probability scale, of the "within"
-bands of the default recommendation table. The default 0.1 is the 10
-percentage points of Mander & Sweeting's Table IV; the row labels follow
-it. Use \code{table_band = band} to tie the table to the indifference band.}
-
 \item{breaks}{Cut points for the recommendation table, or \code{NULL} for the
-bands set by \code{table_band}.}
+bands set by \code{band}.}
 
 \item{...}{Not used.}
 }
 \value{
-A \code{PipeSummary} with \verb{@by_combo} (one row per combination: truth,
-percentage of trials selecting it, mean patients, share of patients,
-percentage of trials that tried it), \verb{@trials} (mean patients enrolled,
-percentage stopped early), \verb{@metrics} and \verb{@bands}.
+A \code{PipeSummary} with \verb{@by_combo} (one row per combination: truth, its
+class, percentage of trials selecting it, mean patients, share of
+patients, percentage of trials that tried it), \verb{@trials} (mean patients
+enrolled, percentage stopped early), \verb{@metrics} and \verb{@bands}.
 }
 \description{
 Turns a \code{\link[=simulate]{simulate()}} result into the tables that papers report: where
@@ -41,37 +34,40 @@ operating characteristics of the design. Each metric follows the definition
 of the paper it comes from, so results can be compared with theirs.
 }
 \details{
-Combinations are first classed by the true scenario, using an indifference
-band of half-width \code{band} around \code{theta}. For \code{target = "MTD"},
-\emph{favourable} is a probability of at most \code{theta - band} (safe) and
-\emph{unfavourable} is at least \code{theta + band} (toxic). For \code{target = "MED"} the
-sides swap: favourable (effective) is a mean of at least \code{theta + band}.
-Combinations inside the band are \emph{indifferent} and count for neither
-side. With \code{band = 0}, "above \code{theta}" means a parameter above it by more
-than a rounding error.
+The final estimate is a 0/1 vector \code{gamma} (1 = parameter above \code{theta}),
+and the final dose set is the minimal combinations with \code{gamma = 1} for MED
+and the maximal combinations with \code{gamma = 0} for MTD. The true scenario is
+put on the same footing with an indifference interval of half-width \code{band}
+around \code{theta}: a combination is \emph{above} (true \code{gamma = 1}) when its
+parameter is at least \code{theta + band}, \emph{below} (true \code{gamma = 0}) when it is
+at most \code{theta - band}, and \emph{in band} in between. In-band combinations
+are the likely MTD (or MTC) and are reported on their own; they count as
+neither true \code{gamma = 1} nor true \code{gamma = 0}. With \code{band = 0} there is no
+in-band class and "above" means above \code{theta} by more than a rounding
+error. The same \code{band} sets the width of the Mander & Sweeting
+recommendation table.
 
 The metrics (\verb{@metrics}, with Monte Carlo standard errors) are:
 \itemize{
 \item \code{fdr} (Cheung et al. 2022, eq. 7): the proportion of the final dose set
-(the MED or MTD set) that is unfavourable, 0 when the set is empty.
-Indifferent combinations count in the set's size but not as false.
-\item \code{tpr} (eq. 8): the proportion of favourable combinations that the final
-estimate declares favourable (\code{gamma} = 1 for MED, 0 for MTD). A
-stopped trial declares nothing, so it counts 0 in \code{fdr} and \code{tpr}; with
-many stops FDR is pulled down. FDR is 0 when no combination is
-unfavourable in the truth. Both are averaged over trials, and trials
-with no favourable combination are left out of \code{tpr}.
+whose true \code{gamma} is wrong for the target: 0 for MED, 1 for MTD. It is 0
+when the set is empty or when no combination has that true \code{gamma}. In-band
+combinations count in the set's size but are never false.
+\item \code{tpr} (eq. 8): the proportion of combinations with the right true \code{gamma}
+for the target (1 for MED, 0 for MTD) that the final \code{gamma} also gives
+that value. A stopped trial declares nothing, so it counts 0 in \code{fdr} and
+\code{tpr}, and with many stops FDR is pulled down. Both are averaged over
+trials, and trials with no such combination are left out of \code{tpr}.
 \item \code{pcs} (Riviere et al. 2014, Wages): the proportion of trials whose single
 pick is a true MTD, a combination with \verb{|truth - theta| <= mtd_tol}. Trials
 with no pick count as failures. Binary MTD designs only. It is \code{NA} when
 no combination is that close to \code{theta}; a wider \code{mtd_tol} gives a "within
 \code{mtd_tol} of the target" version.
-\item \code{pct_patients_favourable}, \code{pct_patients_unfavourable}: the share of
-patients treated at each kind of combination (an overdose rate for MTD),
-averaged over trials. This is not the pooled share in \verb{@by_combo}, and
-the two differ when trials stop early.
-\item \code{p_set_unfavourable}: the proportion of trials whose final dose set
-contains an unfavourable combination.
+\item \code{pct_patients_above}, \code{pct_patients_below}, \code{pct_patients_in_band}: the
+share of patients treated at each class, averaged over trials. This is not
+the pooled share in \verb{@by_combo}, and the two differ when trials stop early.
+\item \code{p_set_false}: the proportion of trials whose final dose set contains a
+combination counted false by \code{fdr}.
 \item \code{mean_recommended} (Mander & Sweeting 2015): the mean number of
 combinations in the final set, counting 0 for a trial that stopped.
 }
@@ -80,15 +76,15 @@ combinations in the final set, counting 0 for a trial that stopped.
 combinations pooled over trials, as a percentage by true-parameter band,
 with each trial that recommended nothing counted once as "None" in the
 denominator. The default bands follow Table IV of that paper, by distance
-from \code{theta} in percentage points, with the width set by \code{table_band}
-(the paper's three bands, with the outer bands split by side). Only the recommendation percentages
-are given, not their experimentation percentages. Give \code{breaks}
-(increasing, left-closed cut points covering the true values, e.g.
+from \code{theta} in percentage points, with half-width \code{band} (0.1 gives their
+10 points); the labels follow it. Only the recommendation percentages are
+given, not their experimentation percentages. Give \code{breaks} (increasing,
+left-closed cut points covering the true values, e.g.
 \code{c(0, .15, .25, .35, .46, 1)} for their Table III) to use your own.
 }
 \examples{
 g <- DoseGrid(levels = c(A = 2, B = 2))
 des <- ms_design(g, theta = 0.3, prior_median = 0.3, prior_strength = 1 / 4, N = 12)
 sim <- simulate(des, nsim = 20, seed = 1, truth = c(0.1, 0.2, 0.3, 0.5))
-summary(sim, band = 0)
+summary(sim)
 }

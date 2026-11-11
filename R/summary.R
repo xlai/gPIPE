@@ -5,36 +5,39 @@
 #' operating characteristics of the design. Each metric follows the definition
 #' of the paper it comes from, so results can be compared with theirs.
 #'
-#' Combinations are first classed by the true scenario, using an indifference
-#' band of half-width `band` around `theta`. For `target = "MTD"`,
-#' *favourable* is a probability of at most `theta - band` (safe) and
-#' *unfavourable* is at least `theta + band` (toxic). For `target = "MED"` the
-#' sides swap: favourable (effective) is a mean of at least `theta + band`.
-#' Combinations inside the band are *indifferent* and count for neither
-#' side. With `band = 0`, "above `theta`" means a parameter above it by more
-#' than a rounding error.
+#' The final estimate is a 0/1 vector `gamma` (1 = parameter above `theta`),
+#' and the final dose set is the minimal combinations with `gamma = 1` for MED
+#' and the maximal combinations with `gamma = 0` for MTD. The true scenario is
+#' put on the same footing with an indifference interval of half-width `band`
+#' around `theta`: a combination is *above* (true `gamma = 1`) when its
+#' parameter is at least `theta + band`, *below* (true `gamma = 0`) when it is
+#' at most `theta - band`, and *in band* in between. In-band combinations
+#' are the likely MTD (or MTC) and are reported on their own; they count as
+#' neither true `gamma = 1` nor true `gamma = 0`. With `band = 0` there is no
+#' in-band class and "above" means above `theta` by more than a rounding
+#' error. The same `band` sets the width of the Mander & Sweeting
+#' recommendation table.
 #'
 #' The metrics (`@metrics`, with Monte Carlo standard errors) are:
 #' * `fdr` (Cheung et al. 2022, eq. 7): the proportion of the final dose set
-#'   (the MED or MTD set) that is unfavourable, 0 when the set is empty.
-#'   Indifferent combinations count in the set's size but not as false.
-#' * `tpr` (eq. 8): the proportion of favourable combinations that the final
-#'   estimate declares favourable (`gamma` = 1 for MED, 0 for MTD). A
-#'   stopped trial declares nothing, so it counts 0 in `fdr` and `tpr`; with
-#'   many stops FDR is pulled down. FDR is 0 when no combination is
-#'   unfavourable in the truth. Both are averaged over trials, and trials
-#'   with no favourable combination are left out of `tpr`.
+#'   whose true `gamma` is wrong for the target: 0 for MED, 1 for MTD. It is 0
+#'   when the set is empty or when no combination has that true `gamma`. In-band
+#'   combinations count in the set's size but are never false.
+#' * `tpr` (eq. 8): the proportion of combinations with the right true `gamma`
+#'   for the target (1 for MED, 0 for MTD) that the final `gamma` also gives
+#'   that value. A stopped trial declares nothing, so it counts 0 in `fdr` and
+#'   `tpr`, and with many stops FDR is pulled down. Both are averaged over
+#'   trials, and trials with no such combination are left out of `tpr`.
 #' * `pcs` (Riviere et al. 2014, Wages): the proportion of trials whose single
 #'   pick is a true MTD, a combination with `|truth - theta| <= mtd_tol`. Trials
 #'   with no pick count as failures. Binary MTD designs only. It is `NA` when
 #'   no combination is that close to `theta`; a wider `mtd_tol` gives a "within
 #'   `mtd_tol` of the target" version.
-#' * `pct_patients_favourable`, `pct_patients_unfavourable`: the share of
-#'   patients treated at each kind of combination (an overdose rate for MTD),
-#'   averaged over trials. This is not the pooled share in `@by_combo`, and
-#'   the two differ when trials stop early.
-#' * `p_set_unfavourable`: the proportion of trials whose final dose set
-#'   contains an unfavourable combination.
+#' * `pct_patients_above`, `pct_patients_below`, `pct_patients_in_band`: the
+#'   share of patients treated at each class, averaged over trials. This is not
+#'   the pooled share in `@by_combo`, and the two differ when trials stop early.
+#' * `p_set_false`: the proportion of trials whose final dose set contains a
+#'   combination counted false by `fdr`.
 #' * `mean_recommended` (Mander & Sweeting 2015): the mean number of
 #'   combinations in the final set, counting 0 for a trial that stopped.
 #'
@@ -42,38 +45,33 @@
 #' combinations pooled over trials, as a percentage by true-parameter band,
 #' with each trial that recommended nothing counted once as "None" in the
 #' denominator. The default bands follow Table IV of that paper, by distance
-#' from `theta` in percentage points, with the width set by `table_band`
-#' (the paper's three bands, with the outer bands split by side). Only the recommendation percentages
-#' are given, not their experimentation percentages. Give `breaks`
-#' (increasing, left-closed cut points covering the true values, e.g.
+#' from `theta` in percentage points, with half-width `band` (0.1 gives their
+#' 10 points); the labels follow it. Only the recommendation percentages are
+#' given, not their experimentation percentages. Give `breaks` (increasing,
+#' left-closed cut points covering the true values, e.g.
 #' `c(0, .15, .25, .35, .46, 1)` for their Table III) to use your own.
 #'
 #' @param object A `PipeSimulation` from [simulate()].
-#' @param band Half-width of the indifference band. `NULL` uses
-#'   `band_frac * theta` for MTD and `0` for MED.
-#' @param band_frac Width of the default MTD band as a fraction of `theta`.
-#'   The default 0.25 is the decided calibration band; 0.5 is the sensitivity
-#'   analysis. Not used when `band` is given.
+#' @param band Half-width of the indifference interval and of the recommendation
+#'   table, on the scale of the parameter. The default is 0.1, the 10
+#'   percentage points of Mander & Sweeting, for binary outcomes, and 0 for
+#'   normal outcomes, whose scale is not a probability.
 #' @param mtd_tol Tolerance for "true MTD" in `pcs` only: a combination is a
-#'   true MTD when `|truth - theta| <= mtd_tol`. Separate from the bands; the
+#'   true MTD when `|truth - theta| <= mtd_tol`. Separate from `band`; the
 #'   default is a rounding tolerance, as in Riviere et al., whose true MTDs sit
 #'   exactly at the target.
-#' @param table_band Half-width, on the probability scale, of the "within"
-#'   bands of the default recommendation table. The default 0.1 is the 10
-#'   percentage points of Mander & Sweeting's Table IV; the row labels follow
-#'   it. Use `table_band = band` to tie the table to the indifference band.
 #' @param breaks Cut points for the recommendation table, or `NULL` for the
-#'   bands set by `table_band`.
+#'   bands set by `band`.
 #' @param ... Not used.
-#' @return A `PipeSummary` with `@by_combo` (one row per combination: truth,
-#'   percentage of trials selecting it, mean patients, share of patients,
-#'   percentage of trials that tried it), `@trials` (mean patients enrolled,
-#'   percentage stopped early), `@metrics` and `@bands`.
+#' @return A `PipeSummary` with `@by_combo` (one row per combination: truth, its
+#'   class, percentage of trials selecting it, mean patients, share of
+#'   patients, percentage of trials that tried it), `@trials` (mean patients
+#'   enrolled, percentage stopped early), `@metrics` and `@bands`.
 #' @examples
 #' g <- DoseGrid(levels = c(A = 2, B = 2))
 #' des <- ms_design(g, theta = 0.3, prior_median = 0.3, prior_strength = 1 / 4, N = 12)
 #' sim <- simulate(des, nsim = 20, seed = 1, truth = c(0.1, 0.2, 0.3, 0.5))
-#' summary(sim, band = 0)
+#' summary(sim)
 #' @name summary.PipeSimulation
 NULL
 
@@ -89,23 +87,20 @@ PipeSummary := new_class(
   )
 )
 
-# Class each combination as favourable, unfavourable or indifferent (see
-# `summary.PipeSimulation`). Favourable is a deliberate side, so a value
-# exactly at the edge of the band is on that side, within `tol`.
-classify_truth <- function(target, theta, truth, band, tol = 1e-9) {
-  above <- truth > theta + tol
+# Class each combination by its true parameter: "above" (true gamma = 1),
+# "below" (true gamma = 0) or "indifferent" (inside the band); see
+# `summary.PipeSimulation`. A value exactly at the edge of the band is on
+# the outer side, within `tol`.
+classify_truth <- function(theta, truth, band, tol = 1e-9) {
   if (band == 0) {
-    # No indifference zone: a parameter above theta (beyond `tol`) is "above".
-    fav <- if (target == "MTD") !above else above
-    unfav <- !fav
+    above <- truth > theta + tol
+    below <- !above
   } else {
-    low <- truth <= theta - band + tol
-    high <- truth >= theta + band - tol
-    fav <- if (target == "MTD") low else high
-    unfav <- if (target == "MTD") high else low
+    above <- truth >= theta + band - tol
+    below <- truth <= theta - band + tol
   }
-  factor(ifelse(fav, "favourable", ifelse(unfav, "unfavourable", "indifferent")),
-         levels = c("favourable", "unfavourable", "indifferent"))
+  factor(ifelse(above, "above", ifelse(below, "below", "indifferent")),
+         levels = c("above", "below", "indifferent"))
 }
 
 mc_row <- function(metric, x) {
@@ -149,8 +144,7 @@ check_breaks <- function(breaks, truth) {
   }
 }
 
-method(summary, PipeSimulation) <- function(object, band = NULL, band_frac = 0.25, mtd_tol = 1e-8,
-                                            table_band = 0.1, breaks = NULL, ...) {
+method(summary, PipeSimulation) <- function(object, band = NULL, mtd_tol = 1e-8, breaks = NULL, ...) {
   des <- object@design
   K <- n_combos(des@grid)
   nsim <- nrow(object@summary)
@@ -158,28 +152,28 @@ method(summary, PipeSimulation) <- function(object, band = NULL, band_frac = 0.2
   if (length(truth) != K) {
     stop("The simulation has no `truth` for every combination.", call. = FALSE)
   }
-  if (is.null(band)) band <- if (des@target == "MTD") band_frac * des@theta else 0
+  if (is.null(band)) band <- if (des@outcome == "binary") 0.1 else 0
   if (!is.numeric(band) || length(band) != 1L || is.na(band) || band < 0) {
     stop("`band` must be a single number, 0 or more.", call. = FALSE)
   }
-  if (!is.numeric(table_band) || length(table_band) != 1L || is.na(table_band) || table_band <= 0) {
-    stop("`table_band` must be a single positive number.", call. = FALSE)
-  }
   if (!is.null(breaks)) check_breaks(breaks, truth)
-  cls <- classify_truth(des@target, des@theta, truth, band)
-  fav <- cls == "favourable"
-  unfav <- cls == "unfavourable"
+  cls <- classify_truth(des@theta, truth, band)
+  above <- cls == "above"
+  below <- cls == "below"
+  # Right and wrong true gamma for the target: MED looks for gamma = 1, MTD for gamma = 0.
+  right <- if (des@target == "MED") above else below
+  wrong <- if (des@target == "MED") below else above
 
   stopped <- object@summary$stopped
   fin <- object@final_set
   # FDR is over the final dose set (Cheung eq. 7); TPR over every combination
-  # the final estimate declares favourable (eq. 8). A stopped trial declares nothing.
-  # With no unfavourable combination in the truth nothing can be a false
+  # the final estimate gives the target's gamma (eq. 8). A stopped trial declares
+  # nothing. With no combination of the wrong true gamma nothing can be a false
   # discovery, so FDR is 0 (set explicitly; an empty set also gives 0).
-  fdr <- if (any(unfav)) rowSums(fin[, unfav, drop = FALSE]) / pmax(1, rowSums(fin)) else numeric(nsim)
+  fdr <- if (any(wrong)) rowSums(fin[, wrong, drop = FALSE]) / pmax(1, rowSums(fin)) else numeric(nsim)
   declared <- if (des@target == "MED") object@gamma == 1 else object@gamma == 0
   declared[stopped, ] <- FALSE
-  tpr <- if (any(fav)) rowSums(declared[, fav, drop = FALSE]) / sum(fav) else rep(NA_real_, nsim)
+  tpr <- if (any(right)) rowSums(declared[, right, drop = FALSE]) / sum(right) else rep(NA_real_, nsim)
 
   pcs <- NULL
   true_mtd <- abs(truth - des@theta) <= mtd_tol
@@ -189,17 +183,14 @@ method(summary, PipeSimulation) <- function(object, band = NULL, band_frac = 0.2
   }
   n_tot <- rowSums(object@n)
   share <- function(sel) if (any(sel)) 100 * rowSums(object@n[, sel, drop = FALSE]) / n_tot else rep(NA_real_, nsim)
-  set_unfav <- if (any(unfav)) {
-    as.numeric(rowSums(fin[, unfav, drop = FALSE]) > 0)
-  } else {
-    rep(NA_real_, nsim)
-  }
+  set_false <- if (any(wrong)) as.numeric(rowSums(fin[, wrong, drop = FALSE]) > 0) else rep(NA_real_, nsim)
   metrics <- rbind(
     mc_row("fdr", fdr), mc_row("tpr", tpr),
     if (!is.null(pcs)) mc_row("pcs", pcs),
-    mc_row("pct_patients_favourable", share(fav)),
-    mc_row("pct_patients_unfavourable", share(unfav)),
-    mc_row("p_set_unfavourable", set_unfav),
+    mc_row("pct_patients_above", share(above)),
+    mc_row("pct_patients_below", share(below)),
+    mc_row("pct_patients_in_band", share(cls == "indifferent")),
+    mc_row("p_set_false", set_false),
     mc_row("mean_recommended", rowSums(fin))
   )
 
@@ -214,7 +205,7 @@ method(summary, PipeSimulation) <- function(object, band = NULL, band_frac = 0.2
     trials = data.frame(nsim = nsim, mean_n = mean(object@summary$n_enrolled),
                         pct_stopped = 100 * mean(stopped)),
     metrics = metrics,
-    bands = ms_band_table(colSums(fin), truth, des@theta, breaks, sum(rowSums(fin) == 0), table_band)
+    bands = ms_band_table(colSums(fin), truth, des@theta, breaks, sum(rowSums(fin) == 0), band)
   )
 }
 
