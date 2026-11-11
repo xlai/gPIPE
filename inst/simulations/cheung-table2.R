@@ -1,3 +1,4 @@
+# nolint start: object_usage_linter. Objects from cheung-table2-report.R are sourced at run time.
 # Cheung, Chandereng and Diaz (2022), Table 2: five PIPE designs on the 252
 # plateau scenarios of the sedentary break study. See README.md for settings.
 #
@@ -55,9 +56,13 @@ cheung_metrics <- function(s, n, gamma, set) {
 }
 
 scen_row <- function(design, eps, scenario, s, m) {
-  one <- function(x) c(mean = if (all(is.na(x))) NA_real_ else mean(x, na.rm = TRUE),
-                       var = if (sum(!is.na(x)) > 1) stats::var(x, na.rm = TRUE) else NA_real_)
-  f <- one(m$fdr); t <- one(m$tpr); e <- one(m$n_eff)
+  one <- function(x) {
+    c(mean = if (all(is.na(x))) NA_real_ else mean(x, na.rm = TRUE),
+      var = if (sum(!is.na(x)) > 1) stats::var(x, na.rm = TRUE) else NA_real_)
+  }
+  f <- one(m$fdr)
+  t <- one(m$tpr)
+  e <- one(m$n_eff)
   data.frame(design = design, eps = eps, scenario = scenario, n_trials = length(m$fdr),
              n_right = sum(s == 1), fdr_mean = f[["mean"]], fdr_var = f[["var"]],
              tpr_mean = t[["mean"]], tpr_var = t[["var"]],
@@ -214,3 +219,4 @@ if (stage == "calib") {
   utils::write.csv(cal, file.path(out_dir, "cheung_table2_calibration_adaptive.csv"), row.names = FALSE)
   print(cal)
 }
+# nolint end
