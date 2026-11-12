@@ -194,7 +194,7 @@
 "IV","B","closest","min_S",8000,"rec","None",0.0323897,0.01449
 "IV","B","closest","min_S",8000,"mean_n_rec","",1.929,0.008288
 "IV","C","closest","min_S",8000,"exp","at",18.8728,0.1957
-"IV","C","closest","min_S",8000,"exp","1-10",45.4292,0.2466
+"IV","C","closest","min_S",8000,"exp","1-10",45.4293,0.2466
 "IV","C","closest","min_S",8000,"exp",">10",33.6878,0.2477
 "IV","C","closest","min_S",8000,"exp","None",2.01025,0.1316
 "IV","C","closest","min_S",8000,"rec","at",29.5266,0.4238
@@ -220,7 +220,7 @@
 "IV","E","closest","min_S",8000,"rec",">10",3.99515,0.1608
 "IV","E","closest","min_S",8000,"rec","None",0.47227,0.05494
 "IV","E","closest","min_S",8000,"mean_n_rec","",1.94938,0.00862
-"IV","F","closest","min_S",8000,"exp","at",11.6513,0.1579
+"IV","F","closest","min_S",8000,"exp","at",11.6512,0.1579
 "IV","F","closest","min_S",8000,"exp","1-10",68.318,0.256
 "IV","F","closest","min_S",8000,"exp",">10",18.4885,0.1673
 "IV","F","closest","min_S",8000,"exp","None",1.54225,0.1297

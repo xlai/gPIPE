@@ -61,13 +61,11 @@ ms2015_band <- function(table, truth, theta) {
   }
 }
 
-# Estimate and Monte Carlo standard error of a ratio of totals,
-# sum(x) / sum(d), over trials (delta method).
-ratio_se <- function(x, d) {
-  m <- length(x)
-  est <- if (sum(d) > 0) sum(x) / sum(d) else NA_real_
-  se <- if (sum(d) > 0) sqrt(m * stats::var(x - est * d)) / sum(d) else NA_real_
-  c(estimate = est, se = se)
+# Influence of each trial on a ratio of totals, sum(x) / sum(d) (delta
+# method): the variance of the ratio is var(influence) / number of trials.
+ratio_influence <- function(x, d) {
+  if (sum(d) == 0) return(rep(NA_real_, length(x)))
+  (x - sum(x) / sum(d) * d) / mean(d)
 }
 
 # M&S's summary of one configuration, as pipe.design computes it.
@@ -79,8 +77,12 @@ ratio_se <- function(x, d) {
 # the patients not treated in stopped trials as "None" (denominator N per
 # trial). Recommendation %: recommended doses per band, pooled over trials.
 # Table IV counts each stopped trial once as "None".
-# Returns one row per cell with the estimate (percent, or doses for
-# mean_n_rec) and its Monte Carlo standard error.
+# Returns `cells`, one row per cell with the estimate (percent, or doses for
+# mean_n_rec) and its Monte Carlo standard error, and `cov`, the Monte Carlo
+# covariance of the cells of this configuration in long form (cells numbered
+# in the order of `cells`, upper triangle). The cells come from the same
+# trials and the percentages of one metric sum to 100, so they are not
+# independent; the chi-square test in compare.R needs the covariance.
 ms2015_summary <- function(cfg, n, rec, stopped, truth) {
   band <- ms2015_band(cfg$table, c(truth), cfg$theta)
   by_band <- function(x) vapply(levels(band), function(b) rowSums(x[, band == b, drop = FALSE]), numeric(nrow(x)))
@@ -90,15 +92,36 @@ ms2015_summary <- function(cfg, n, rec, stopped, truth) {
     n_b <- cbind(n_b, None = cfg$N - rowSums(n))
     rec_b <- cbind(rec_b, None = as.numeric(stopped))
   }
-  cell <- function(metric, x) {
-    out <- vapply(colnames(x), function(b) 100 * ratio_se(x[, b], rowSums(x)), numeric(2))
-    data.frame(metric = metric, band = colnames(x), estimate = out[1, ], se = out[2, ])
-  }
   n_rec <- rowSums(rec)
-  out <- rbind(cell("exp", n_b), cell("rec", rec_b),
-               data.frame(metric = "mean_n_rec", band = "", estimate = mean(n_rec),
-                          se = stats::sd(n_rec) / sqrt(length(n_rec))))
-  cbind(cfg[c("table", "scenario", "admis", "selection")], nsim = nrow(n), out, row.names = NULL)
+  pct <- function(x) 100 * colSums(x) / sum(x)
+  cells <- data.frame(
+    metric = rep(c("exp", "rec", "mean_n_rec"), c(ncol(n_b), ncol(rec_b), 1)),
+    band = c(colnames(n_b), colnames(rec_b), ""),
+    estimate = c(pct(n_b), pct(rec_b), mean(n_rec))
+  )
+  influence <- cbind(
+    100 * apply(n_b, 2, ratio_influence, d = rowSums(n_b)),
+    100 * apply(rec_b, 2, ratio_influence, d = rowSums(rec_b)),
+    n_rec - mean(n_rec)
+  )
+  v <- stats::cov(influence) / nrow(n)
+  cells$se <- sqrt(diag(v))
+  key <- cfg[c("table", "scenario", "admis", "selection")]
+  upper <- which(upper.tri(v, diag = TRUE), arr.ind = TRUE)
+  list(cells = cbind(key, nsim = nrow(n), cells, row.names = NULL),
+       cov = cbind(key, cell_i = upper[, 1], cell_j = upper[, 2], cov = v[upper], row.names = NULL))
+}
+
+# Write the cells of all configurations to `out` and their covariances to
+# the same name with "_cov" before ".csv".
+ms2015_write <- function(res, out) {
+  cells <- do.call(rbind, lapply(res, `[[`, "cells"))
+  cells$estimate <- signif(cells$estimate, 6)
+  cells$se <- signif(cells$se, 4)
+  utils::write.csv(cells, out, row.names = FALSE)
+  v <- do.call(rbind, lapply(res, `[[`, "cov"))
+  v$cov <- signif(v$cov, 6)
+  utils::write.csv(v, sub("[.]csv$", "_cov.csv", out), row.names = FALSE)
 }
 
 # Trials per configuration: REPS times the paper's 1000 (III) or 2000 (IV).

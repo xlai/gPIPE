@@ -22,7 +22,4 @@ run_one <- function(i) {
   ms2015_summary(cfg, sim@n, sim@final_set, sim@summary$stopped, sim@truth)
 }
 res <- parallel::mclapply(seq_len(nrow(cfgs)), run_one, mc.cores = cores, mc.preschedule = FALSE)
-res <- do.call(rbind, res)
-res$estimate <- signif(res$estimate, 6)
-res$se <- signif(res$se, 4)
-write.csv(res, out, row.names = FALSE)
+ms2015_write(res, out)

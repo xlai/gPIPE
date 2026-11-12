@@ -8,8 +8,11 @@ authors' package, pipe.design 0.5.1, and against the printed tables
   summary both runs share.
 - `run_gpipe.R`, `run_pipe_design.R`: the two runs, with 4000 trials per
   Table III configuration and 8000 per Table IV scenario (4 times the paper).
-- `compare.R`: differences in Monte Carlo standard errors.
-- `results/`: the stored runs and the printed tables (`ms2015_paper.csv`).
+- `compare.R`: one chi-square test over all configurations, and the
+  difference of each cell in Monte Carlo standard errors.
+- `results/`: the stored runs, the Monte Carlo covariance of each
+  configuration's cells (`*_cov.csv`) and the printed tables
+  (`ms2015_paper.csv`).
 
 Design: weak prior (strength 1 / K per dose; medians from scenario 1 or A),
 neighbouring constraint, safety rule at 0.8, start at the lowest
