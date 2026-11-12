@@ -7,6 +7,7 @@
 * Faster simulation: the trial loop reads the grid from a plain list made once per design, and no longer runs `match.arg()` at every step. Results are unchanged (#31).
 * The minimum cut of the estimator now runs in C++ through Rcpp (a new dependency), so the package needs a compiler to install from source. A 5 x 5 trial of 125 patients simulates about four times faster, and grids of thousands of combinations become practical. Results are unchanged (#33).
 * Fixed: per-dose priors no longer give `NA` posteriors; trials no longer stop silently when no border dose is in the neighbourhood; the taper reaches `eps` at the last patient.
+* Fixed: the recommended phase II doses of a Mander & Sweeting design are now the closest doses among those that pass the safety rule, as in pipe.design. Before, a dose that was safe on the contour but failed the safety rule stopped the dose below it from being recommended (about 1 trial in 450 in the Table III settings) (#31).
 * Golden tests against pipe.design 0.5.1 decision snapshots and Cheung et al. (2022) Table 1, run per implementation so each refactor step enables its own tests (#17).
 
 ## Breaking changes

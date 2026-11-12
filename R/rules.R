@@ -147,8 +147,8 @@ ms_selection_weights <- function(candidates, S,
 # and whether the trial stops (no admissible dose; pipe.design gives no RP2D
 # then). Unless stopped: the dominant and candidate doses, the min-S ties and
 # the dose-choice weights for `selection`. With final = TRUE, the RP2D:
-# closest doses over the whole grid that are safe, tried and pass the safety
-# rule.
+# closest doses among those that pass the safety rule, over the whole grid,
+# that are safe on the mode contour and tried.
 ms_decide <- function(grid, p, n, S, history, admis = c("closest", "adjacent"),
                       constraint = "neighbouring", safety = 0.8, selection = "inverse_S",
                       start = 1L, final = FALSE) {
@@ -192,8 +192,10 @@ ms_decide <- function(grid, p, n, S, history, admis = c("closest", "adjacent"),
     out$rp2d <- if (out$stopped) {
       integer()
     } else {
-      closest <- ms_closest(grid, gamma, rep(TRUE, K))
-      sort(closest[gamma[closest] == 0 & n[closest] > 0 & safe[closest]])
+      # As pipe.design: closest within the doses that pass the safety rule,
+      # so a dose it excludes does not block the dose below it.
+      closest <- ms_closest(grid, gamma, safe)
+      sort(closest[gamma[closest] == 0 & n[closest] > 0])
     }
   }
   out

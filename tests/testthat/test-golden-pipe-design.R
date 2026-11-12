@@ -43,3 +43,24 @@ test_each_impl(desc, "ms_state", function(impl) {
     expect_true(got$stopped, info = s$id)
   }
 })
+
+# Final states from 23,000 replayed pipe.design trials (#31) where a dose that
+# is safe on the mode contour fails the safety rule. pipe.design finds the
+# closest doses among the doses that pass the rule, so the dose below the
+# excluded one is recommended.
+desc <- "RP2D is closest within the doses that pass the safety rule"
+test_each_impl(desc, "ms_state", function(impl) {
+  skip_if_not_installed("jsonlite")
+  v5 <- jsonlite::read_json(fixture_path("pipe_design_V5.json"))$meta
+  states <- jsonlite::read_json(fixture_path("pipe_design_rpii_V5.json"))$states
+  expect_length(states, 36)
+  for (s in states) {
+    spec <- list(levels = c(v5$V5$I, v5$V5$J), theta = v5$V5$theta,
+                 a = c(json_matrix(v5$V5$prior_a)), b = c(json_matrix(v5$V5$prior_b)),
+                 n = unlist(s$n), r = unlist(s$r), history = s$last_dose,
+                 admis = s$admis, final = TRUE, safety = v5$epsilon)
+    got <- impl$ms_state(spec)
+    expect_false(got$stopped, info = s$id)
+    expect_equal(as.numeric(got$rp2d), as.numeric(unlist(s$rpII)), info = s$id)
+  }
+})
