@@ -3,7 +3,8 @@ linters: linters_with_defaults(
     object_name_linter = NULL
   )
 exclusions: sapply(
-    list.files("tests/testthat", pattern = "[.]R$", full.names = TRUE),
+    c(list.files("tests/testthat", pattern = "[.]R$", full.names = TRUE),
+      list.files("inst/simulations", pattern = "[.]R$", full.names = TRUE, recursive = TRUE)),
     function(f) list(object_usage_linter = Inf),
     simplify = FALSE
   )
