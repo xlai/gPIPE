@@ -1,9 +1,9 @@
 # Stored results of the MTD component sensitivity study (#45, steps 1 and 2).
 #
 # The results are stored in inst/simulations/mtd_sensitivity/results: the
-# calibration of epsilon for the baseline design, and 10000 trials of each
-# configuration (baseline, epsilon = 0.5, and the Mander & Sweeting design)
-# on Riviere et al.'s scenario 1. The scripts beside them make the runs
+# calibrations of epsilon (three values of alpha), and 10000 trials of each
+# configuration (the baseline, the one-factor-at-a-time rows and the Mander &
+# Sweeting design) on Riviere et al.'s scenario 1. The scripts beside them make the runs
 # again. This checks the stored files only, so it does not change when the
 # package code changes.
 
@@ -15,6 +15,7 @@ test_that("the stored MTD sensitivity results are complete and consistent", {
   rdir <- file.path(mtd_dir(), "results")
   read <- function(f, ...) utils::read.csv(file.path(rdir, f), ...)
   for (f in c("mtd_sensitivity.csv", "mtd_sensitivity_runs.csv", "calibration_baseline.csv",
+              "calibration_alpha_0.10.csv", "calibration_alpha_0.20.csv",
               "riviere2014_scenario1_pcs.csv")) {
     expect_true(file.exists(file.path(rdir, f)), info = f)
   }
@@ -23,10 +24,16 @@ test_that("the stored MTD sensitivity results are complete and consistent", {
   cal <- read("calibration_baseline.csv")
   ref <- read("riviere2014_scenario1_pcs.csv")
 
-  ids <- c("baseline", "eps_0.5", "ref_ms")
-  expect_true(all(ids %in% res$id))
-  expect_true(all(ids %in% runs$id))
-  expect_equal(runs$nsim[match(ids, runs$id)], rep(10000, 3))
+  ids <- c("baseline", "eps_0.5", "ref_ms",
+           "eps_0.4", "eps_0.3", "eps_0.15", "eps_0.05", "alpha_0.10", "alpha_0.20",
+           "taper_off", "weights_1", "prior_strength_1", "prior_strength_4",
+           "prior_beta_1_1", "prior_beta_0.5_0.5", "prior_correct", "prior_too_low",
+           "prior_too_high", "prior_correct_strength_1", "selection_prob", "cohort_1",
+           "N_30", "N_120", "start_top", "single_pick_off")
+  expect_setequal(res$id, ids)
+  expect_setequal(runs$id, ids)
+  expect_equal(runs$nsim, rep(10000, length(ids)))
+  expect_false(anyDuplicated(runs$seed) > 0)
 
   # Every metric is there, for every configuration, and the combinations are
   # the 15 of the 5 x 3 grid.
@@ -41,6 +48,7 @@ test_that("the stored MTD sensitivity results are complete and consistent", {
     expect_setequal(r$metric[r$combo == ""], overall)
     for (m in by_combo) expect_identical(r$combo[r$metric == m], labels)
     expect_equal(nrow(r), length(overall) + 3 * 15, info = id)
+    expect_false(anyNA(r$estimate), info = id)
   }
 
   # Estimates and standard errors are in range. Proportions lie in [0, 1],
@@ -51,10 +59,19 @@ test_that("the stored MTD sensitivity results are complete and consistent", {
   is_pct <- grepl("^pct_", res$metric)
   expect_true(all(res$estimate[is_prop] >= 0 & res$estimate[is_prop] <= 1))
   expect_true(all(res$estimate[is_pct] >= 0 & res$estimate[is_pct] <= 100))
-  expect_true(all(res$estimate[res$metric %in% c("mean_patients", "mean_n")] <= 60))
-  # A trial has 20 cohorts, so the first cohort on the contour is 1 to 20.
-  fc <- res$estimate[res$metric == "first_contour_cohort"]
-  expect_true(all(fc >= 1 & fc <= 20))
+  # N is 30, 60 or 120 patients, in cohorts of 3 (cohort_1: of 1).
+  n_max <- c(N_30 = 30, N_120 = 120)
+  n_cap <- ifelse(res$id %in% names(n_max), n_max[res$id], 60)
+  is_n <- res$metric %in% c("mean_patients", "mean_n")
+  expect_true(all(res$estimate[is_n] <= n_cap[is_n]))
+  # The first cohort on the contour is 1 to the number of cohorts: 10, 20,
+  # 40 or, with cohorts of 1, 60.
+  max_cohorts <- rep(20, nrow(res))
+  max_cohorts[res$id == "N_30"] <- 10
+  max_cohorts[res$id == "N_120"] <- 40
+  max_cohorts[res$id == "cohort_1"] <- 60
+  fc <- res$metric == "first_contour_cohort"
+  expect_true(all(res$estimate[fc] >= 1 & res$estimate[fc] <= max_cohorts[fc]))
   expect_true(all(res$estimate[res$metric == "n_mtd_tried"] <= 3))
   expect_true(all(res$estimate[res$metric == "n_distinct"] <= 15))
   # Patients per combination add up to the mean number enrolled.
@@ -75,15 +92,33 @@ test_that("the stored MTD sensitivity results are complete and consistent", {
     expect_lte(sum(pick$estimate), 100 + 1e-6)
   }
 
-  # The calibrated epsilon is the one the baseline row used, and it is the
-  # selected row of the calibration path, whose false discovery rate is
-  # within alpha.
-  expect_equal(sum(cal$selected), 1)
-  eps_cal <- cal$eps[cal$selected]
-  expect_equal(runs$eps[runs$id == "baseline"], eps_cal)
-  expect_lte(cal$fdr[cal$selected], cal$alpha[1])
-  expect_true(is.na(runs$eps[runs$id == "ref_ms"]))
-  expect_equal(runs$eps[runs$id == "eps_0.5"], 0.5)
+  # Each calibration file has one selected epsilon, whose false discovery
+  # rate is within its alpha. Alpha grows with the file: 0.05, 0.10, 0.20,
+  # and so does the selected epsilon.
+  cals <- list(baseline = cal, alpha_0.10 = read("calibration_alpha_0.10.csv"),
+               alpha_0.20 = read("calibration_alpha_0.20.csv"))
+  for (nm in names(cals)) {
+    cl <- cals[[nm]]
+    expect_equal(sum(cl$selected), 1, info = nm)
+    expect_lte(cl$fdr[cl$selected], cl$alpha[1])
+  }
+  expect_equal(vapply(cals, function(x) x$alpha[1], 0, USE.NAMES = FALSE), c(0.05, 0.10, 0.20))
+  sel <- vapply(cals, function(x) x$eps[x$selected], 0, USE.NAMES = FALSE)
+  expect_true(all(diff(sel) > 0))
+
+  # Rows that use a calibrated epsilon used the one selected in their file:
+  # the baseline and every row that keeps its epsilon use the baseline
+  # calibration, and the two alpha rows use their own. Fixed-epsilon rows
+  # have the value in their id, and the M&S row has none.
+  eps_of <- function(id) runs$eps[runs$id == id]
+  fixed <- c(eps_0.5 = 0.5, eps_0.4 = 0.4, eps_0.3 = 0.3, eps_0.15 = 0.15, eps_0.05 = 0.05)
+  for (id in names(fixed)) expect_equal(eps_of(id), fixed[[id]], info = id)
+  expect_true(is.na(eps_of("ref_ms")))
+  expect_equal(eps_of("alpha_0.10"), sel[2])
+  expect_equal(eps_of("alpha_0.20"), sel[3])
+  for (id in setdiff(ids, c(names(fixed), "ref_ms", "alpha_0.10", "alpha_0.20"))) {
+    expect_equal(eps_of(id), sel[1], info = id)
+  }
 
   # Riviere's published PCS for scenario 1 (percent): seven designs.
   expect_equal(nrow(ref), 7)

@@ -1,9 +1,12 @@
 # Print the stored results: one row per configuration with the main metrics,
-# the selection grid of one configuration, and Riviere's reference line.
+# grouped by factor with the baseline repeated at the top of each group, the
+# difference from the baseline in PCS, FDR and TPR (with its SE and z), the
+# selection grid of one configuration, and Riviere's reference line.
 # Usage: Rscript report.R [id = baseline]
 # Run from this folder.
 library(gPIPE)
 source("common.R")
+options(width = 250)
 args <- commandArgs(trailingOnly = TRUE)
 show_id <- if (length(args) >= 1) args[1] else "baseline"
 res <- utils::read.csv("results/mtd_sensitivity.csv",
@@ -40,8 +43,39 @@ for (nm in names(cols)) {
 }
 cat(sprintf("MTD sensitivity study: %d trials per configuration, theta = %g, band = %g.\n",
             runs$nsim[1], mtd_theta, mtd_band))
-cat("Estimate (Monte Carlo SE). PCS, FDR, TPR and P.setFalse are in percent.\n\n")
-print(tab, row.names = FALSE, right = FALSE)
+cat("Estimate (Monte Carlo SE). PCS, FDR, TPR and P.setFalse are in percent.\n")
+cat("Rows other than the eps and calibration rows use the baseline eps.\n")
+
+# One block per factor, in the order of mtd_configs(); the baseline row is
+# repeated at the top of each block (except its own).
+groups <- unique(tab$factor[tab$id != "baseline"])
+show_groups <- function(t) {
+  for (g in groups) {
+    cat(sprintf("\n== %s ==\n", g))
+    b <- t[t$id == "baseline", , drop = FALSE]
+    print(rbind(b, t[t$factor == g, , drop = FALSE]), row.names = FALSE, right = FALSE)
+  }
+}
+show_groups(tab)
+
+# Difference from the baseline in PCS, FDR and TPR, in percentage points. The
+# runs are independent, so SE = sqrt(se1^2 + se2^2) and z = difference / SE.
+dif <- function(id, metric) {
+  a <- get(id, metric)
+  b <- get("baseline", metric)
+  d <- 100 * (a$estimate - b$estimate)
+  se <- 100 * sqrt(a$mc_se^2 + b$mc_se^2)
+  c(d = d, se = se, z = if (se > 0) d / se else NA_real_)
+}
+dtab <- data.frame(id = ids, factor = tab$factor, stringsAsFactors = FALSE)
+for (nm in c("PCS", "FDR", "TPR")) {
+  v <- t(vapply(ids, dif, c(d = 0, se = 0, z = 0), metric = tolower(nm)))
+  base <- ids == "baseline"
+  dtab[[paste0("d", nm, " (SE)")]] <- ifelse(base, "-", sprintf("%+.1f (%.1f)", v[, "d"], v[, "se"]))
+  dtab[[paste0("z", nm)]] <- ifelse(base, "-", sprintf("%+.1f", v[, "z"]))
+}
+cat("\nDifference from the baseline in percentage points, with its SE and z (difference / SE).\n")
+show_groups(dtab)
 
 grid_of <- function(metric, id) {
   v <- res[res$id == id & res$metric == metric, ]

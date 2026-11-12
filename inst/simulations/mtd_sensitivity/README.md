@@ -1,15 +1,17 @@
-# MTD component sensitivity study (issue #45, steps 1 and 2)
+# MTD component sensitivity study (issue #45, steps 1 to 3)
 
 How much does each component of PIPE with epsilon-tapering matter for
 finding the maximum tolerated dose (MTD) contour with binary toxicity? This
-folder holds the scaffold and the first runs: the baseline and two reference
-lines. Later steps add configurations that change one component at a time.
+folder holds the baseline, two reference lines, and rows that change one
+factor at a time from the baseline. Factors that need a change in the
+package code come later.
 
 - `common.R`: the scenario, the configuration table `mtd_configs()`, the
   design built from a row, and the summary of one simulation.
-- `calibrate.R`: calibrates epsilon for the baseline design.
+- `calibrate.R`: calibrates epsilon for the baseline design, for a given alpha.
 - `run.R`: simulates configurations and stores the summaries.
-- `report.R`: prints the stored results.
+- `report.R`: prints the stored results by factor, with the difference from
+  the baseline.
 - `results/`: the stored runs (see below).
 
 To add a configuration, add one row in `mtd_configs()` (with a new `id` and
@@ -47,6 +49,11 @@ bisection on [0.01, 0.5] down to a bracket of 0.005, seed 1. The path of
 every epsilon tried (FDR, TPR, SE) is in `results/calibration_baseline.csv`,
 with the settings. `run.R` reads epsilon from that file.
 
+Two more calibrations use alpha = 0.10 and 0.20 and nothing else changed
+(`results/calibration_alpha_0.10.csv`, `results/calibration_alpha_0.20.csv`).
+A configuration names the file its epsilon comes from in its `calibration`
+column.
+
 ## Other configurations
 
 - `eps_0.5`: the baseline with epsilon = 0.5 (tapering has no effect).
@@ -57,6 +64,41 @@ with the settings. `run.R` reads epsilon from that file.
 - Riviere's published PCS for scenario 1 (`results/riviere2014_scenario1_pcs.csv`)
   is a reference line only. Those designs are different and they used 2000
   replications.
+
+## One-factor-at-a-time rows
+
+Each row changes one thing from the baseline. **Every row keeps the baseline
+epsilon (0.113) except the epsilon rows and the calibration rows.** Epsilon
+is not recalibrated when N, the prior, the cohort size or any other factor
+changes. So a change in N or in the prior also changes the false discovery
+rate that epsilon was chosen to control, and the rows are not at equal FDR.
+Compare the FDR column as well as PCS.
+
+| factor | rows |
+|---|---|
+| eps | `eps_0.4`, `eps_0.3`, `eps_0.15`, `eps_0.05` (and `eps_0.5`) |
+| calibration alpha | `alpha_0.10` (epsilon 0.217), `alpha_0.20` (epsilon 0.492) |
+| taper | `taper_off`: `taper = FALSE` |
+| weights | `weights_1`: weights `"1"` |
+| prior strength | `prior_strength_1`, `prior_strength_4`: flat, median 0.30, strength 1 and 4 |
+| prior form | `prior_beta_1_1`: Beta(1,1). `prior_beta_0.5_0.5`: Beta(0.5,0.5). `prior_correct`: increasing medians equal to the truth of scenario 1. `prior_too_low`: medians equal to the truth of Riviere scenario 3 (the prior thinks doses are less toxic than they are). `prior_too_high`: medians equal to scenario 2 (more toxic). The three increasing priors have strength 1/15. |
+| prior form x strength | `prior_correct_strength_1`: the correct medians with strength 1 |
+| selection | `selection_prob`: selection `"prob"` |
+| cohort | `cohort_1`: cohorts of 1 |
+| N | `N_30`, `N_120` |
+| start | `start_top`: start at A5.B3 (combination 15) |
+| single pick | `single_pick_off`: `within_set = FALSE` |
+
+The two other scenario truths are in `common.R` (`mtd_truth_s2`,
+`mtd_truth_s3`), copied from `riviere2014_scenarios_all14.csv` in the same
+combination order. A Beta prior with median 0.5 and strength 2 is Beta(1,1),
+and strength 1 is Beta(0.5,0.5), so both are flat rows of the table. The
+prior column `prior_form` is `flat` or the scenario whose truth gives the
+medians.
+
+With N = 30 and N = 120, and with cohorts of 1, the number of cohorts
+changes (10, 40 and 60). `first_contour_cohort` counts cohorts, so it is not
+comparable across those rows.
 
 ## Metrics
 
@@ -110,7 +152,8 @@ with `pct_` are percentages. The others are counts.
   whole-trial metric), `estimate`, `mc_se`.
 - `mtd_sensitivity_runs.csv`: per configuration, trials, seed, epsilon used,
   and seconds.
-- `calibration_baseline.csv`, `riviere2014_scenario1_pcs.csv`.
+- `calibration_baseline.csv`, `calibration_alpha_0.10.csv`,
+  `calibration_alpha_0.20.csv`, `riviere2014_scenario1_pcs.csv`.
 
 ## Seeds
 
@@ -123,13 +166,15 @@ other configurations run. The calibration uses seed 1.
 
 From this folder:
 
-    Rscript calibrate.R          # about 10 minutes, one core
+    Rscript calibrate.R          # baseline, alpha 0.05: about 10 minutes, one core
+    Rscript calibrate.R 1 0.10 results/calibration_alpha_0.10.csv   # seed, alpha, file
     Rscript run.R 4              # all configurations, about 4 minutes on 4 cores
     Rscript run.R 4 eps_0.5      # only these, and only their rows change
     Rscript report.R [id]        # tables; grids for one configuration
 
-Run times for 10000 trials: baseline and `eps_0.5` about 26 seconds each,
-`ref_ms` about 230 seconds (the safety rule is slower). `run.R` needs the
+Run times for 10000 trials: about 25 seconds per row, `cohort_1` about 75
+seconds, `N_120` about 50 seconds, `ref_ms` about 230 seconds (the safety
+rule is slower). `run.R` needs the
 installed gPIPE.
 
 `tests/testthat/test-simulation-mtd-sensitivity.R` checks the stored results.

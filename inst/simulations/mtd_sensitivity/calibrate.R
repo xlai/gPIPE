@@ -1,15 +1,16 @@
-# Calibrate epsilon for the baseline design (alpha = 0.05, band = 0.1) and
-# write every epsilon tried to results/calibration_baseline.csv.
-# Usage: Rscript calibrate.R [seed = 1] [out = results/calibration_baseline.csv]
+# Calibrate epsilon for the baseline design (band = 0.1) and write every
+# epsilon tried to a file in results/.
+# Usage: Rscript calibrate.R [seed = 1] [alpha = 0.05] [out = results/calibration_baseline.csv]
+# For example: Rscript calibrate.R 1 0.10 results/calibration_alpha_0.10.csv
 # Run from this folder. One process (calibrate_eps() is serial).
 library(gPIPE)
 source("common.R")
 args <- commandArgs(trailingOnly = TRUE)
 seed <- if (length(args) >= 1) as.integer(args[1]) else 1L
-out <- if (length(args) >= 2) args[2] else "results/calibration_baseline.csv"
+alpha <- if (length(args) >= 2) as.numeric(args[2]) else 0.05
+out <- if (length(args) >= 3) args[3] else "results/calibration_baseline.csv"
 
 # Settings. Each evaluation runs nsim trials of 60 patients in each scenario.
-alpha <- 0.05
 scenarios <- mtd_upsets()  # all 56 monotone configurations, so no ensemble is drawn
 n_scenarios <- length(scenarios)
 nsim <- 600L
