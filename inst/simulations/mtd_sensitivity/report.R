@@ -61,8 +61,10 @@ show_groups(tab)
 # Difference from the baseline in PCS, FDR and TPR, in percentage points. The
 # runs are independent, so SE = sqrt(se1^2 + se2^2) and z = difference / SE.
 dif <- function(id, metric) {
-  a <- get(id, metric); b <- get("baseline", metric)
-  d <- 100 * (a$estimate - b$estimate); se <- 100 * sqrt(a$mc_se^2 + b$mc_se^2)
+  a <- get(id, metric)
+  b <- get("baseline", metric)
+  d <- 100 * (a$estimate - b$estimate)
+  se <- 100 * sqrt(a$mc_se^2 + b$mc_se^2)
   c(d = d, se = se, z = if (se > 0) d / se else NA_real_)
 }
 dtab <- data.frame(id = ids, factor = tab$factor, stringsAsFactors = FALSE)

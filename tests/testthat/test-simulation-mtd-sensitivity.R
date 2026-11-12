@@ -66,8 +66,10 @@ test_that("the stored MTD sensitivity results are complete and consistent", {
   expect_true(all(res$estimate[is_n] <= n_cap[is_n]))
   # The first cohort on the contour is 1 to the number of cohorts: 10, 20,
   # 40 or, with cohorts of 1, 60.
-  max_cohorts <- ifelse(res$id == "N_30", 10, ifelse(res$id == "N_120", 40,
-                        ifelse(res$id == "cohort_1", 60, 20)))
+  max_cohorts <- rep(20, nrow(res))
+  max_cohorts[res$id == "N_30"] <- 10
+  max_cohorts[res$id == "N_120"] <- 40
+  max_cohorts[res$id == "cohort_1"] <- 60
   fc <- res$metric == "first_contour_cohort"
   expect_true(all(res$estimate[fc] >= 1 & res$estimate[fc] <= max_cohorts[fc]))
   expect_true(all(res$estimate[res$metric == "n_mtd_tried"] <= 3))
