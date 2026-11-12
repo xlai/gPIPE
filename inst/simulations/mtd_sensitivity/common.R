@@ -15,6 +15,15 @@ mtd_nsim <- 10000L
 mtd_truth <- matrix(c(0.05, 0.10, 0.15, 0.30, 0.45,
                       0.10, 0.15, 0.30, 0.45, 0.55,
                       0.15, 0.30, 0.45, 0.50, 0.60), nrow = 5, ncol = 3)
+# True toxicity of Riviere scenarios 2 and 3 (same combination order), used
+# as increasing priors that are too high (scenario 2) or too low (scenario 3)
+# for scenario 1. Taken from riviere2014_scenarios_all14.csv.
+mtd_truth_s2 <- c(0.15, 0.30, 0.45, 0.50, 0.60,
+                  0.30, 0.45, 0.50, 0.60, 0.75,
+                  0.45, 0.55, 0.60, 0.70, 0.80)
+mtd_truth_s3 <- c(0.02, 0.07, 0.10, 0.15, 0.30,
+                  0.07, 0.10, 0.15, 0.30, 0.45,
+                  0.10, 0.15, 0.30, 0.45, 0.55)
 mtd_grid <- function() DoseGrid(levels = c(A = nrow(mtd_truth), B = ncol(mtd_truth)))
 
 # Every monotone true configuration of the grid, as 0/1 vectors over the
@@ -43,8 +52,15 @@ mtd_is_contour <- function(truth = c(mtd_truth), theta = mtd_theta) truth >= the
 #                 calibrate.R, read from results/calibration_baseline.csv;
 #   taper, weights, selection: as in PipeDesign (for "ms", selection is the
 #                 M&S choice and taper and weights are not used);
-#   prior_median, prior_strength, prior_method: flat Beta prior on every
-#                 combination, with this median and strength a + b;
+#   prior_median, prior_strength, prior_method: Beta prior with this median
+#                 and strength a + b;
+#   prior_form:   "flat" (the same median at every combination), or an
+#                 increasing prior whose medians are the truth of
+#                 "scenario1" ("correct"), "scenario3" (too low) or
+#                 "scenario2" (too high); then prior_median is not used.
+#                 Beta(1,1) is flat with median 0.5, strength 2; Beta(0.5,0.5)
+#                 is flat with median 0.5, strength 1 (exact method);
+#   calibration:  file in results/ that gives epsilon when eps is NA;
 #   N, cohort, start (NA = the default, combination 1), delta, within_set;
 #   admis, constraint, safety: M&S options ("ms" only; safety NA = none);
 #   seed:         seed of this configuration's simulation (unique per row).
@@ -52,12 +68,14 @@ mtd_configs <- function() {
   K <- nrow(mtd_truth) * ncol(mtd_truth)
   row <- function(id, factor, rule = "cheung", eps = NA_real_, taper = TRUE, weights = "n+1",
                   selection = "equal", prior_median = mtd_theta, prior_strength = 1 / K,
-                  prior_method = "exact", N = 60, cohort = 3, start = NA_real_, delta = 0.1,
+                  prior_method = "exact", prior_form = "flat",
+                  calibration = "calibration_baseline.csv", N = 60, cohort = 3, start = NA_real_, delta = 0.1,
                   within_set = TRUE, admis = NA_character_, constraint = NA_character_,
                   safety = NA_real_, seed) {
     data.frame(id = id, factor = factor, rule = rule, eps = eps, taper = taper, weights = weights,
                selection = selection, prior_median = prior_median, prior_strength = prior_strength,
-               prior_method = prior_method, N = N, cohort = cohort, start = start, delta = delta,
+               prior_method = prior_method, prior_form = prior_form,
+               calibration = calibration, N = N, cohort = cohort, start = start, delta = delta,
                within_set = within_set, admis = admis, constraint = constraint, safety = safety,
                seed = seed, stringsAsFactors = FALSE)
   }
@@ -69,17 +87,42 @@ mtd_configs <- function() {
     # way to find the median).
     row("ref_ms", "reference", rule = "ms", eps = NA_real_, weights = NA_character_,
         taper = NA, selection = "min_S", prior_method = "bisection", admis = "closest",
-        constraint = "neighbouring", safety = 0.8, seed = 4503)
+        constraint = "neighbouring", safety = 0.8, seed = 4503),
+    # One factor at a time from the baseline. Epsilon stays at the baseline
+    # calibration (NA) unless the row is about epsilon or the calibration.
+    row("eps_0.4", "eps", eps = 0.4, seed = 4504),
+    row("eps_0.3", "eps", eps = 0.3, seed = 4505),
+    row("eps_0.15", "eps", eps = 0.15, seed = 4506),
+    row("eps_0.05", "eps", eps = 0.05, seed = 4507),
+    row("alpha_0.10", "calibration alpha", calibration = "calibration_alpha_0.10.csv", seed = 4508),
+    row("alpha_0.20", "calibration alpha", calibration = "calibration_alpha_0.20.csv", seed = 4509),
+    row("taper_off", "taper", taper = FALSE, seed = 4510),
+    row("weights_1", "weights", weights = "1", seed = 4511),
+    row("prior_strength_1", "prior strength", prior_strength = 1, seed = 4512),
+    row("prior_strength_4", "prior strength", prior_strength = 4, seed = 4513),
+    row("prior_beta_1_1", "prior form", prior_median = 0.5, prior_strength = 2, seed = 4514),
+    row("prior_beta_0.5_0.5", "prior form", prior_median = 0.5, prior_strength = 1, seed = 4515),
+    row("prior_correct", "prior form", prior_form = "scenario1", seed = 4516),
+    row("prior_too_low", "prior form", prior_form = "scenario3", seed = 4517),
+    row("prior_too_high", "prior form", prior_form = "scenario2", seed = 4518),
+    row("prior_correct_strength_1", "prior form x strength", prior_form = "scenario1",
+        prior_strength = 1, seed = 4519),
+    row("selection_prob", "selection", selection = "prob", seed = 4520),
+    row("cohort_1", "cohort", cohort = 1, seed = 4521),
+    row("N_30", "N", N = 30, seed = 4522),
+    row("N_120", "N", N = 120, seed = 4523),
+    row("start_top", "start", start = 15, seed = 4524),
+    row("single_pick_off", "single pick", within_set = FALSE, seed = 4525)
   )
 }
 
 # Epsilon of a configuration: its own value, or for NA the calibrated value
-# stored in results/calibration_baseline.csv. NA for the M&S rule.
+# stored in the file of its `calibration` column. NA for the M&S rule.
 mtd_eps <- function(cfg, dir = "results") {
   if (cfg$rule != "cheung") return(NA_real_)
   if (!is.na(cfg$eps)) return(cfg$eps)
-  f <- file.path(dir, "calibration_baseline.csv")
-  if (!file.exists(f)) stop("Run calibrate.R first: ", f, " is missing.", call. = FALSE)
+  f <- file.path(dir, cfg$calibration)
+  if (!file.exists(f)) stop("Run calibrate.R first (see README): ", f, " is missing.", call. = FALSE)
   cal <- utils::read.csv(f)
   eps <- unique(cal$eps[cal$selected])
   if (length(eps) != 1L) stop("The calibration file does not name one selected eps.", call. = FALSE)
@@ -99,8 +142,11 @@ mtd_design <- function(cfg, eps = mtd_eps(cfg)) {
                      constraint = cfg$constraint, safety = if (is.na(cfg$safety)) NULL else cfg$safety,
                      selection = cfg$selection, delta = cfg$delta, within_set = cfg$within_set))
   }
-  pr <- gPIPE:::beta_prior_from_median(rep(cfg$prior_median, K), cfg$prior_strength,
-                                       method = cfg$prior_method)
+  med <- switch(cfg$prior_form,
+                flat = rep(cfg$prior_median, K),
+                scenario1 = c(mtd_truth), scenario2 = mtd_truth_s2, scenario3 = mtd_truth_s3,
+                stop("Unknown prior_form: ", cfg$prior_form, call. = FALSE))
+  pr <- gPIPE:::beta_prior_from_median(med, cfg$prior_strength, method = cfg$prior_method)
   cheung_design(grid, theta = mtd_theta, eps = eps, target = "MTD", outcome = "binary",
                 taper = cfg$taper, weights = cfg$weights, selection = cfg$selection,
                 prior_a = pr$a, prior_b = pr$b, N = cfg$N, cohort = cfg$cohort, start = start,
