@@ -27,9 +27,20 @@ for all.}
 
 \item{weights}{\code{"n+1"} or \code{"1"}; \code{NULL} for the rule's default.}
 
-\item{selection}{How the next dose is drawn: \code{"equal"} or \code{"prob"} for
-\code{"cheung"}; \code{"min_S"}, \code{"inverse_S"}, \code{"equal"} or \code{"inverse_sqrt_S"}
-for \code{"ms"}. \code{NULL} for the rule's default.}
+\item{selection}{How the next dose is drawn. For \code{"cheung"}, from the
+sampling set S1 u S0, with probability
+\itemize{
+\item \code{"equal"}: the same for every dose;
+\item \code{"prob"}: proportional to the probability of the favourable state;
+\item \code{"fewest"}: the same for the doses with the fewest patients so far;
+\item \code{"inverse_n"}: proportional to 1 / (n + 1), with n the patients so far;
+\item \code{"interval"}: proportional to the posterior probability that the
+parameter is within \code{delta} of \code{theta} (binary outcome only).
+}
+
+If all weights are 0, the doses get equal probability. For \code{"ms"}:
+\code{"min_S"}, \code{"inverse_S"}, \code{"equal"} or \code{"inverse_sqrt_S"}. \code{NULL} for the
+rule's default.}
 
 \item{admis, constraint, safety}{M&S options: \code{"closest"} or \code{"adjacent"};
 \code{"neighbouring"} or \code{"non-neighbouring"}; the safety threshold, or \code{NULL}
@@ -41,7 +52,8 @@ for no safety rule.}
 dose for Cheung MED designs, combination 1 otherwise).}
 
 \item{delta, within_set}{Riviere's single pick: the interval half-width and
-whether to pick within the final set or among all tried doses.}
+whether to pick within the final set or among all tried doses. \code{delta} is
+also the half-width of \code{selection = "interval"}.}
 }
 \value{
 A \code{PipeDesign} object.
