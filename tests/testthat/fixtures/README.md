@@ -47,3 +47,14 @@ and Algorithm 1-EQ (eps = 0.05). Levels are 1-based.
 
 With w = n + 1 and untried p = 0.5, all 24 MED sets reproduce, and every dose
 lies in S1 u S0 (Algorithm 1, step 3) of the previous estimate.
+
+## `pipe_design_rpii_V5.json`
+
+36 final states from 23,000 replayed pipe.design 0.5.1 trials (#31; 1000 per
+configuration of Tables III and IV) in which a dose that is safe on the mode
+contour fails the safety rule (q >= 0.8). pipe.design finds the closest doses
+among the doses that pass the rule, so it recommends the dose below the
+excluded one. Each state has the patients `n` and toxicities `r` per
+combination, the dose of the last cohort and the recommended doses `rpII`,
+all as 1-based combination indices in array order. The prior a, b are those
+of `pipe_design_V5.json`.
