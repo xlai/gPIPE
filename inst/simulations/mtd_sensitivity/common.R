@@ -61,6 +61,8 @@ mtd_is_contour <- function(truth = c(mtd_truth), theta = mtd_theta) truth >= the
 #                 Beta(1,1) is flat with median 0.5, strength 2; Beta(0.5,0.5)
 #                 is flat with median 0.5, strength 1 (exact method);
 #   calibration:  file in results/ that gives epsilon when eps is NA;
+#   shift:        shift of the decision threshold (theta + shift), cheung
+#                 only; 0 is the usual rule;
 #   N, cohort, start (NA = the default, combination 1), delta, within_set;
 #   admis, constraint, safety: M&S options ("ms" only; safety NA = none);
 #   seed:         seed of this configuration's simulation (unique per row).
@@ -71,13 +73,13 @@ mtd_configs <- function() {
                   prior_method = "exact", prior_form = "flat",
                   calibration = "calibration_baseline.csv", N = 60, cohort = 3, start = NA_real_, delta = 0.1,
                   within_set = TRUE, admis = NA_character_, constraint = NA_character_,
-                  safety = NA_real_, seed) {
+                  safety = NA_real_, shift = 0, seed) {
     data.frame(id = id, factor = factor, rule = rule, eps = eps, taper = taper, weights = weights,
                selection = selection, prior_median = prior_median, prior_strength = prior_strength,
                prior_method = prior_method, prior_form = prior_form,
                calibration = calibration, N = N, cohort = cohort, start = start, delta = delta,
                within_set = within_set, admis = admis, constraint = constraint, safety = safety,
-               seed = seed, stringsAsFactors = FALSE)
+               shift = shift, seed = seed, stringsAsFactors = FALSE)
   }
   rbind(
     row("baseline", "baseline", seed = 4501),
@@ -112,7 +114,33 @@ mtd_configs <- function() {
     row("N_30", "N", N = 30, seed = 4522),
     row("N_120", "N", N = 120, seed = 4523),
     row("start_top", "start", start = 15, seed = 4524),
-    row("single_pick_off", "single pick", within_set = FALSE, seed = 4525)
+    row("single_pick_off", "single pick", within_set = FALSE, seed = 4525),
+    # Selection of the next dose from the sampling set.
+    row("selection_fewest", "selection", selection = "fewest", seed = 4526),
+    row("selection_inverse_n", "selection", selection = "inverse_n", seed = 4527),
+    row("selection_interval", "selection", selection = "interval", seed = 4528),
+    # Band shift: the shift is the band b of its calibration (truths at
+    # theta +- b, so the toxic ones sit on the threshold theta + b), and
+    # epsilon is calibrated again for that design. summary() keeps band 0.1.
+    row("shift_0.1", "band shift", shift = 0.1, calibration = "calibration_shift_0.1.csv", seed = 4529),
+    row("shift_0.075", "band shift", shift = 0.075, calibration = "calibration_shift_0.075.csv",
+        seed = 4530),
+    row("shift_0.05", "band shift", shift = 0.05, calibration = "calibration_shift_0.05.csv", seed = 4531),
+    row("shift_0.025", "band shift", shift = 0.025, calibration = "calibration_shift_0.025.csv",
+        seed = 4532),
+    # The shift of shift_0.1 with the baseline epsilon (not recalibrated).
+    row("shift_0.1_eps_fixed", "band shift, fixed eps", shift = 0.1, seed = 4533),
+    # Exploratory rows: each changes more than one thing from the baseline.
+    row("eps_0.4_pick_all", "combination", eps = 0.4, within_set = FALSE, seed = 4534),
+    row("eps_0.3_pick_all", "combination", eps = 0.3, within_set = FALSE, seed = 4535),
+    row("shift_0.1_pick_all", "combination", shift = 0.1, calibration = "calibration_shift_0.1.csv",
+        within_set = FALSE, seed = 4536),
+    row("shift_0.1_pick_all_fewest", "combination", shift = 0.1, selection = "fewest",
+        calibration = "calibration_shift_0.1.csv", within_set = FALSE, seed = 4537),
+    row("shift_0.1_pick_all_interval", "combination", shift = 0.1, selection = "interval",
+        calibration = "calibration_shift_0.1.csv", within_set = FALSE, seed = 4538),
+    row("shift_0.05_pick_all", "combination", shift = 0.05, calibration = "calibration_shift_0.05.csv",
+        within_set = FALSE, seed = 4539)
   )
 }
 
@@ -149,7 +177,7 @@ mtd_design <- function(cfg, eps = mtd_eps(cfg)) {
   pr <- gPIPE:::beta_prior_from_median(med, cfg$prior_strength, method = cfg$prior_method)
   cheung_design(grid, theta = mtd_theta, eps = eps, target = "MTD", outcome = "binary",
                 taper = cfg$taper, weights = cfg$weights, selection = cfg$selection,
-                prior_a = pr$a, prior_b = pr$b, N = cfg$N, cohort = cfg$cohort, start = start,
+                shift = cfg$shift, prior_a = pr$a, prior_b = pr$b, N = cfg$N, cohort = cfg$cohort, start = start,
                 delta = cfg$delta, within_set = cfg$within_set)
 }
 

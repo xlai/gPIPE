@@ -69,6 +69,11 @@ are placed at \code{theta + band} and the rest at \code{theta - band} for binary
 outcomes. For normal outcomes the rest sit at \code{theta}, the least favourable
 null, and the others at \code{theta + band}. The band only sets how far apart the
 simulated truths are, so it also sets how hard the calibration is.
+The true values do not move with the design's \code{shift}; they stay around
+\code{theta}. With \code{shift} equal to \code{band}, the combinations above sit exactly at
+the decision threshold \code{theta + shift} (the least favourable case, as in
+Cheung's calibration for MED), and the others are two bands below it for
+binary outcomes (one band for normal outcomes).
 
 The false discovery rate rises with \code{eps}, so \code{eps} is found by bisection
 on \verb{[lower, upper]}, not by a grid. Every evaluation uses the same seeds

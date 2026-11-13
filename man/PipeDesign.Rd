@@ -8,7 +8,14 @@
 
 \item{target}{\code{"MTD"} or \code{"MED"}.}
 
-\item{theta}{Target threshold.}
+\item{theta}{Target threshold. This is the clinical target, for example a
+toxicity of 0.3 for MTD.}
+
+\item{shift}{A single number added to \code{theta} to give the decision
+threshold \code{theta + shift} (default 0). A positive value moves the
+threshold up. Only for \code{rule = "cheung"}; \code{rule = "ms"} with a \code{shift}
+other than 0 is an error. For a binary outcome, \code{theta + shift} must lie
+strictly between 0 and 1.}
 
 \item{outcome}{\code{"binary"} (Beta priors \code{prior_a}, \code{prior_b}) or
 \code{"normal"} (pooled-variance t posterior, with \code{sigma0} while there is no
@@ -27,9 +34,20 @@ for all.}
 
 \item{weights}{\code{"n+1"} or \code{"1"}; \code{NULL} for the rule's default.}
 
-\item{selection}{How the next dose is drawn: \code{"equal"} or \code{"prob"} for
-\code{"cheung"}; \code{"min_S"}, \code{"inverse_S"}, \code{"equal"} or \code{"inverse_sqrt_S"}
-for \code{"ms"}. \code{NULL} for the rule's default.}
+\item{selection}{How the next dose is drawn. For \code{"cheung"}, from the
+sampling set S1 u S0, with probability
+\itemize{
+\item \code{"equal"}: the same for every dose;
+\item \code{"prob"}: proportional to the probability of the favourable state;
+\item \code{"fewest"}: the same for the doses with the fewest patients so far;
+\item \code{"inverse_n"}: proportional to 1 / (n + 1), with n the patients so far;
+\item \code{"interval"}: proportional to the posterior probability that the
+parameter is within \code{delta} of \code{theta} (binary outcome only).
+}
+
+If all weights are 0, the doses get equal probability. For \code{"ms"}:
+\code{"min_S"}, \code{"inverse_S"}, \code{"equal"} or \code{"inverse_sqrt_S"}. \code{NULL} for the
+rule's default.}
 
 \item{admis, constraint, safety}{M&S options: \code{"closest"} or \code{"adjacent"};
 \code{"neighbouring"} or \code{"non-neighbouring"}; the safety threshold, or \code{NULL}
@@ -41,7 +59,8 @@ for no safety rule.}
 dose for Cheung MED designs, combination 1 otherwise).}
 
 \item{delta, within_set}{Riviere's single pick: the interval half-width and
-whether to pick within the final set or among all tried doses.}
+whether to pick within the final set or among all tried doses. \code{delta} is
+also the half-width of \code{selection = "interval"}.}
 }
 \value{
 A \code{PipeDesign} object.
@@ -56,6 +75,17 @@ Sweeting 2015) or \code{\link[=cheung_design]{cheung_design()}} (Cheung et al. 2
 \details{
 Coding: a combination is "above" when its parameter exceeds \code{theta}
 (toxic for \code{target = "MTD"}, effective for \code{target = "MED"}).
+
+Decisions use the threshold \code{theta + shift}. The posterior probability
+behind every decision is p = P(parameter > \code{theta} + \code{shift} | data). With
+\code{shift = 0} this is the usual rule. A positive \code{shift} moves the threshold
+up, so a combination whose parameter is exactly \code{theta} is called "below"
+more often. This matters for epsilon-tapering with \code{eps} < 0.5, where a
+combination at exactly \code{theta} is called "below" in only about a fraction
+\code{eps} of the trials, so for MTD the design tends to aim one dose level too
+low. A \code{shift} above 0 corrects this. A negative \code{shift} moves the
+threshold down. The target stays \code{theta}: Riviere's single pick, \code{summary()}
+and \code{calibrate_eps()} all use \code{theta}.
 }
 \examples{
 g <- DoseGrid(levels = c(A = 3, B = 3))

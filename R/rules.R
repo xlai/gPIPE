@@ -50,8 +50,13 @@ riviere_pick <- function(set, theta, a, b, n, x, delta = 0.1, within_set = TRUE)
   }
   a <- rep_len(a, length(n))[pool] + x[pool]
   b <- rep_len(b, length(n))[pool] + n[pool] - x[pool]
-  prob <- stats::pbeta(theta + delta, a, b) - stats::pbeta(theta - delta, a, b)
-  pool[which.max(prob)]
+  pool[which.max(beta_interval_prob(theta, delta, a, b))]
+}
+
+# Probability that a Beta(a, b) parameter lies in [theta - delta, theta +
+# delta]. `a` and `b` are the posterior parameters.
+beta_interval_prob <- function(theta, delta, a, b) {
+  stats::pbeta(theta + delta, a, b) - stats::pbeta(theta - delta, a, b)
 }
 
 # ---- Mander & Sweeting (2015) -----------------------------------------------
