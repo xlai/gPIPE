@@ -70,6 +70,9 @@ pipe_trial_design <- function(grid, model, target = c("MTD", "MED"), N, cohort =
   if (!(N >= 1 && cohort >= 1)) {
     stop("`N` and `cohort` must be at least 1.", call. = FALSE)
   }
+  if (length(delta) != 1L || !is.finite(delta) || delta < 0) {
+    stop("`delta` must be a single number, 0 or more.", call. = FALSE)
+  }
   check_eps(eps)
   weights <- weights %||% if (rule == "cheung") "n+1" else "1"
   selection <- selection %||% if (rule == "cheung") "equal" else "min_S"

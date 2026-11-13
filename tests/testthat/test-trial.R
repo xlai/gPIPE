@@ -222,3 +222,12 @@ test_that("equal and prob give the same trials as before (values from dev)", {
   expect_equal(patients("MED", "equal"), c(0, 0, 6, 24, 0, 4, 36, 112, 0, 32, 116, 228, 14, 98, 196, 334))
   expect_equal(patients("MED", "prob"), c(0, 0, 0, 24, 0, 0, 42, 106, 4, 20, 126, 278, 8, 54, 180, 358))
 })
+
+test_that("delta must be a single number, 0 or more", {
+  g <- DoseGrid(levels = c(A = 2, B = 2))
+  m <- outcome_beta(0.3, 1, 1)
+  expect_error(pipe_trial_design(g, m, N = 6, delta = -0.1), "delta")
+  expect_error(pipe_trial_design(g, m, N = 6, delta = c(0.1, 0.2)), "delta")
+  expect_error(pipe_trial_design(g, m, N = 6, delta = NA_real_), "delta")
+  expect_equal(pipe_trial_design(g, m, N = 6, delta = 0)$delta, 0)
+})
