@@ -138,3 +138,96 @@ test_that("an M&S design with the safety rule checks the grid when it is built",
   expect_silent(pipe_trial_design(g, model, "MTD", N = 10, rule = "ms", safety = NULL))
   expect_silent(pipe_trial_design(g, model, "MTD", N = 10, rule = "cheung"))
 })
+
+# ---- selection options of the Cheung rule -----------------------------------
+
+# 3 x 3 grid, MTD, Beta(1, 1) priors, theta = 0.3, no taper. With these data
+# the sampling set is doses 1, 2 and 4, with n = 6, 3, 4 and x = 0, 1, 2.
+selection_step <- function(selection, ...) {
+  des <- pipe_trial_design(DoseGrid(levels = c(3, 3)), outcome_beta(0.3, 1, 1), "MTD", N = 30,
+                           taper = FALSE, selection = selection, ...)
+  n <- c(6, 3, 0, 4, 2, 0, 0, 0, 0)
+  x <- c(0, 1, 0, 2, 2, 0, 0, 0, 0)
+  trial_step(des, n, x, x, 1L)$prob
+}
+
+test_that("new selection options give the hand-computed probabilities", {
+  at <- function(w) replace(numeric(9), c(1, 2, 4), w / sum(w))
+  expect_equal(selection_step("equal"), at(c(1, 1, 1)))
+  # fewest patients: dose 2 (n = 3)
+  expect_equal(selection_step("fewest"), at(c(0, 1, 0)))
+  # 1 / (n + 1) = 1/7, 1/4, 1/5
+  expect_equal(selection_step("inverse_n"), at(1 / c(7, 4, 5)))
+  # Posteriors Beta(1, 7), Beta(2, 3), Beta(3, 3) on [0.2, 0.4]:
+  # By hand, the posterior mass on the interval is 0.1817216 for dose 1,
+  # 0.344 for dose 2 and 0.25952 for dose 4.
+  w <- c(0.1817216, 0.344, 0.25952)
+  expect_equal(selection_step("interval"), at(w))
+  expect_equal(selection_step("interval")[1], 0.1817216 / sum(w))
+  # a wider interval changes the weights through delta
+  expect_equal(selection_step("interval", delta = 0.2),
+               at(beta_interval_prob(0.3, 0.2, c(1, 2, 3), c(7, 3, 3))))
+})
+
+test_that("fewest: ties share, and every weight 0 gives equal weights", {
+  des <- pipe_trial_design(DoseGrid(levels = c(3, 3)), outcome_beta(0.3, 1, 1), "MTD", N = 30,
+                           taper = FALSE, selection = "fewest")
+  n <- c(3, 3, 0, 4, 2, 0, 0, 0, 0)
+  x <- c(0, 1, 0, 2, 2, 0, 0, 0, 0)
+  prob <- trial_step(des, n, x, x, 1L)$prob
+  expect_equal(prob[prob > 0], c(0.5, 0.5))
+  expect_equal(which(prob > 0), c(1L, 2L))
+  # delta = 0: the interval has no mass, so the weights are equal
+  none <- selection_step("interval", delta = 0)
+  expect_equal(none, replace(numeric(9), c(1, 2, 4), 1 / 3))
+})
+
+test_that("new selection options work for MED and on subset grids", {
+  keep <- matrix(TRUE, 3, 3)
+  keep[2, 2] <- FALSE
+  gs <- DoseGrid(levels = c(3, 3), keep = keep)
+  for (target in c("MTD", "MED")) {
+    for (sel in c("fewest", "inverse_n", "interval")) {
+      des <- pipe_trial_design(gs, outcome_beta(0.3, 1, 1), target, N = 20, cohort = 2,
+                               selection = sel)
+      sim <- pipe_simulate(des, rep(0.3, 8), n_trials = 3, seed = 1)
+      expect_true(all(sim$summary$n_enrolled == 20))
+    }
+  }
+})
+
+test_that("selection = \"interval\" needs a binary outcome; M&S keeps its own names", {
+  g <- DoseGrid(levels = c(2, 2))
+  expect_error(pipe_trial_design(g, outcome_normal(0.5, 1), "MED", N = 10, selection = "interval"),
+               "binary outcome")
+  for (sel in c("fewest", "inverse_n", "interval", "prob")) {
+    expect_error(pipe_trial_design(g, outcome_beta(0.3, 1, 1), "MTD", N = 10, rule = "ms",
+                                   selection = sel), "should be one of")
+  }
+  expect_error(pipe_trial_design(g, outcome_beta(0.3, 1, 1), "MTD", N = 10, selection = "min_S"),
+               "should be one of")
+})
+
+test_that("equal and prob give the same trials as before (values from dev)", {
+  g <- DoseGrid(levels = c(4, 4))
+  pr <- beta_prior_from_median(rep(0.3, 16), 1)
+  truth <- c(outer(seq(0.05, 0.35, length.out = 4), seq(0, 0.3, length.out = 4), `+`))
+  patients <- function(target, selection) {
+    des <- pipe_trial_design(g, outcome_beta(0.3, pr$a, pr$b), target, N = 30, cohort = 2,
+                             eps = 0.2, selection = selection)
+    colSums(pipe_simulate(des, truth, 40, seed = 11)$n)
+  }
+  expect_equal(patients("MTD", "equal"), c(270, 196, 90, 14, 206, 170, 40, 4, 94, 56, 8, 0, 44, 8, 0, 0))
+  expect_equal(patients("MTD", "prob"), c(334, 280, 102, 18, 212, 94, 38, 4, 82, 16, 4, 0, 14, 2, 0, 0))
+  expect_equal(patients("MED", "equal"), c(0, 0, 6, 24, 0, 4, 36, 112, 0, 32, 116, 228, 14, 98, 196, 334))
+  expect_equal(patients("MED", "prob"), c(0, 0, 0, 24, 0, 0, 42, 106, 4, 20, 126, 278, 8, 54, 180, 358))
+})
+
+test_that("delta must be a single number, 0 or more", {
+  g <- DoseGrid(levels = c(A = 2, B = 2))
+  m <- outcome_beta(0.3, 1, 1)
+  expect_error(pipe_trial_design(g, m, N = 6, delta = -0.1), "delta")
+  expect_error(pipe_trial_design(g, m, N = 6, delta = c(0.1, 0.2)), "delta")
+  expect_error(pipe_trial_design(g, m, N = 6, delta = NA_real_), "delta")
+  expect_equal(pipe_trial_design(g, m, N = 6, delta = 0)$delta, 0)
+})

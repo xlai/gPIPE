@@ -23,9 +23,18 @@
 #' @param eps,taper Asymmetry of the gain and whether it tapers from 0.5 to
 #'   `eps` over the trial (`"cheung"` only; `"ms"` uses 0.5).
 #' @param weights `"n+1"` or `"1"`; `NULL` for the rule's default.
-#' @param selection How the next dose is drawn: `"equal"` or `"prob"` for
-#'   `"cheung"`; `"min_S"`, `"inverse_S"`, `"equal"` or `"inverse_sqrt_S"`
-#'   for `"ms"`. `NULL` for the rule's default.
+#' @param selection How the next dose is drawn. For `"cheung"`, from the
+#'   sampling set S1 u S0, with probability
+#'   * `"equal"`: the same for every dose;
+#'   * `"prob"`: proportional to the probability of the favourable state;
+#'   * `"fewest"`: the same for the doses with the fewest patients so far;
+#'   * `"inverse_n"`: proportional to 1 / (n + 1), with n the patients so far;
+#'   * `"interval"`: proportional to the posterior probability that the
+#'     parameter is within `delta` of `theta` (binary outcome only).
+#'
+#'   If all weights are 0, the doses get equal probability. For `"ms"`:
+#'   `"min_S"`, `"inverse_S"`, `"equal"` or `"inverse_sqrt_S"`. `NULL` for the
+#'   rule's default.
 #' @param admis,constraint,safety M&S options: `"closest"` or `"adjacent"`;
 #'   `"neighbouring"` or `"non-neighbouring"`; the safety threshold, or `NULL`
 #'   for no safety rule.
@@ -33,7 +42,8 @@
 #' @param start Index of the first combination; `NULL` for the default (top
 #'   dose for Cheung MED designs, combination 1 otherwise).
 #' @param delta,within_set Riviere's single pick: the interval half-width and
-#'   whether to pick within the final set or among all tried doses.
+#'   whether to pick within the final set or among all tried doses. `delta` is
+#'   also the half-width of `selection = "interval"`.
 #' @return A `PipeDesign` object.
 #' @examples
 #' g <- DoseGrid(levels = c(A = 3, B = 3))
