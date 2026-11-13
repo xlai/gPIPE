@@ -35,7 +35,10 @@ sampling set S1 u S0, with probability
 \item \code{"fewest"}: the same for the doses with the fewest patients so far;
 \item \code{"inverse_n"}: proportional to 1 / (n + 1), with n the patients so far;
 \item \code{"interval"}: proportional to the posterior probability that the
-parameter is within \code{delta} of \code{theta} (binary outcome only).
+parameter is within \code{delta} of \code{theta} (binary outcome only);
+\item \code{"closest"}: the same for the doses whose isotonic estimate of the
+toxicity rate is closest to \code{theta} (an untried dose counts as \code{theta}),
+0 for the others (binary outcome and \code{target = "MTD"} only).
 }
 
 If all weights are 0, the doses get equal probability. For \code{"ms"}:

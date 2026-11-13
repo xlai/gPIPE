@@ -231,3 +231,81 @@ test_that("delta must be a single number, 0 or more", {
   expect_error(pipe_trial_design(g, m, N = 6, delta = NA_real_), "delta")
   expect_equal(pipe_trial_design(g, m, N = 6, delta = 0)$delta, 0)
 })
+
+# ---- selection = "closest" (#57) --------------------------------------------
+
+# 3 x 3 grid (combinations 1..9, first drug varies fastest), Beta(1, 1),
+# theta = 0.3, no taper. `n` and `x` give the data of combinations 1, 2, 4, 5.
+closest_step <- function(n, x, selection = "closest") {
+  des <- pipe_trial_design(DoseGrid(levels = c(3, 3)), outcome_beta(0.3, 1, 1), "MTD", N = 30,
+                           taper = FALSE, selection = selection)
+  nn <- xx <- numeric(9)
+  nn[c(1, 2, 4, 5)] <- n
+  xx[c(1, 2, 4, 5)] <- x
+  trial_step(des, nn, xx, xx, 1L)$prob
+}
+
+test_that("closest: a unique closest candidate gets probability 1", {
+  # sampling set 1, 2, 4; estimates 1/6, 1/3, 1/2
+  expect_equal(closest_step(c(6, 6, 6, 0), c(1, 2, 3, 0)), replace(numeric(9), 2, 1))
+  expect_equal(closest_step(c(6, 6, 6, 0), c(1, 2, 3, 0), "equal"),
+               replace(numeric(9), c(1, 2, 4), 1 / 3))
+})
+
+test_that("closest: ties share the probability, and pooling decides the distances", {
+  # n = 5 each, x = 1, 3, 2: raw rates 0.2, 0.6, 0.4, so the raw rates of the
+  # sampling set 1, 2, 4 would give 1 and 4 (both 0.1 from 0.3). Pooling the
+  # violating doses 2 and 4 gives 1/3, 1/3 (0.033 away) and dose 1 is 0.1 away.
+  prob <- closest_step(c(5, 5, 5, 5), c(1, 3, 2, 0))
+  expect_equal(prob, replace(numeric(9), c(2, 4), 0.5))
+})
+
+test_that("closest: an untried candidate counts as theta", {
+  # sampling set 1 to 5; combination 3 is untried (distance 0) and wins
+  prob <- closest_step(c(6, 6, 6, 6), c(2, 1, 3, 3))
+  expect_equal(prob, replace(numeric(9), 3, 1))
+  # two untried candidates tie, although tried doses are close to theta
+  prob <- closest_step(c(10, 5, 5, 0), c(0, 1, 2, 0))
+  expect_equal(prob, replace(numeric(9), c(3, 5), 0.5))
+})
+
+test_that("closest: next_dose() reports the probabilities", {
+  des <- PipeDesign(grid = DoseGrid(levels = c(A = 3, B = 3)), theta = 0.3, N = 30,
+                    taper = FALSE, selection = "closest")
+  # combinations 1, 2, 4 with 5 patients each and 1, 3, 2 DLTs (as above)
+  dat <- data.frame(A = rep(c(1, 2, 1), each = 5), B = rep(c(1, 1, 2), each = 5),
+                    y = c(1, rep(0, 4), rep(1, 3), 0, 0, 1, 1, 0, 0, 0))
+  nd <- next_dose(des, dat)
+  expect_equal(sort(nd$candidates$prob), c(0.5, 0.5))
+  expect_true(nd$dose %in% nd$candidates$dose)
+})
+
+test_that("closest is for the Cheung rule, binary outcomes and MTD only", {
+  g <- DoseGrid(levels = c(2, 2))
+  b <- outcome_beta(0.3, 1, 1)
+  expect_error(pipe_trial_design(g, b, "MTD", N = 10, rule = "ms", selection = "closest"),
+               "should be one of")
+  expect_error(pipe_trial_design(g, b, "MED", N = 10, selection = "closest"), "MTD only")
+  expect_error(pipe_trial_design(g, outcome_normal(0.5, 1), "MTD", N = 10, selection = "closest"),
+               "binary outcome")
+  expect_silent(pipe_trial_design(g, b, "MTD", N = 10, selection = "closest"))
+})
+
+test_that("closest simulates and summarises; equal is unchanged (values from before #57)", {
+  g <- DoseGrid(levels = c(A = 5, B = 3))
+  tr <- c(.05, .10, .15, .30, .45, .10, .15, .30, .45, .55, .15, .30, .45, .50, .60)
+  pr <- beta_prior_from_median(rep(0.3, 15), 1 / 15)
+  design <- function(selection) {
+    pipe_trial_design(g, outcome_beta(0.3, pr$a, pr$b), "MTD", N = 30, cohort = 3, eps = 0.2,
+                      selection = selection, pick = "isotonic", within_set = FALSE)
+  }
+  sim <- pipe_simulate(design("equal"), tr, 30, seed = 5)
+  expect_equal(colSums(sim$n), c(237, 171, 96, 24, 0, 174, 69, 24, 3, 0, 75, 24, 3, 0, 0))
+  expect_equal(sim$summary$pick, c(2L, 2L, 11L, 4L, 11L, 12L, 3L, 3L, 8L, 4L, 4L, 6L, 3L, 6L,
+                                   12L, 11L, 7L, 8L, 6L, 11L, 4L, 2L, 3L, 7L, 7L, 11L, 2L, 11L,
+                                   2L, 11L))
+  sim <- pipe_simulate(design("closest"), tr, 30, seed = 5)
+  expect_true(all(sim$summary$n_enrolled == 30))
+  expect_equal(sim, pipe_simulate(design("closest"), tr, 30, seed = 5))
+  expect_no_error(capture.output(print(summary(sim))))
+})

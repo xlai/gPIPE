@@ -30,7 +30,10 @@
 #'   * `"fewest"`: the same for the doses with the fewest patients so far;
 #'   * `"inverse_n"`: proportional to 1 / (n + 1), with n the patients so far;
 #'   * `"interval"`: proportional to the posterior probability that the
-#'     parameter is within `delta` of `theta` (binary outcome only).
+#'     parameter is within `delta` of `theta` (binary outcome only);
+#'   * `"closest"`: the same for the doses whose isotonic estimate of the
+#'     toxicity rate is closest to `theta` (an untried dose counts as `theta`),
+#'     0 for the others (binary outcome and `target = "MTD"` only).
 #'
 #'   If all weights are 0, the doses get equal probability. For `"ms"`:
 #'   `"min_S"`, `"inverse_S"`, `"equal"` or `"inverse_sqrt_S"`. `NULL` for the

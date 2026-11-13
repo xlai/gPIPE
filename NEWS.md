@@ -10,6 +10,7 @@
 * Fixed: per-dose priors no longer give `NA` posteriors; trials no longer stop silently when no border dose is in the neighbourhood; the taper reaches `eps` at the last patient.
 * Fixed: the recommended phase II doses of a Mander & Sweeting design are now the closest doses among those that pass the safety rule, as in pipe.design. Before, a dose that was safe on the contour but failed the safety rule stopped the dose below it from being recommended (about 1 trial in 450 in the Table III settings) (#31).
 * New `pick = "isotonic"` option of `PipeDesign` for the single recommended dose (binary outcome, MTD): the tried dose whose weighted isotonic estimate of the toxicity rate is closest to the target, computed with the min-cut solver. The default `"interval"` is Riviere's rule as before (#54).
+* New `selection = "closest"` for the Cheung rule (binary outcome, MTD): the next cohort goes to the dose in the sampling set whose isotonic estimate of the toxicity rate is closest to `theta` (an untried dose counts as `theta`; ties share equal probability). The other selections and the defaults are unchanged (#57).
 * Golden tests against pipe.design 0.5.1 decision snapshots and Cheung et al. (2022) Table 1, run per implementation so each refactor step enables its own tests (#17).
 
 ## Breaking changes
