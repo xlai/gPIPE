@@ -9,9 +9,26 @@
 #' Coding: a combination is "above" when its parameter exceeds `theta`
 #' (toxic for `target = "MTD"`, effective for `target = "MED"`).
 #'
+#' Decisions use the threshold `theta + shift`. The posterior probability
+#' behind every decision is p = P(parameter > `theta` + `shift` | data). With
+#' `shift = 0` this is the usual rule. A positive `shift` moves the threshold
+#' up, so a combination whose parameter is exactly `theta` is called "below"
+#' more often. This matters for epsilon-tapering with `eps` < 0.5, where a
+#' combination at exactly `theta` is called "below" in only about a fraction
+#' `eps` of the trials, so for MTD the design tends to aim one dose level too
+#' low. A `shift` above 0 corrects this. A negative `shift` moves the
+#' threshold down. The target stays `theta`: Riviere's single pick, `summary()`
+#' and `calibrate_eps()` all use `theta`.
+#'
 #' @param grid A [DoseGrid].
 #' @param target `"MTD"` or `"MED"`.
-#' @param theta Target threshold.
+#' @param theta Target threshold. This is the clinical target, for example a
+#'   toxicity of 0.3 for MTD.
+#' @param shift A single number added to `theta` to give the decision
+#'   threshold `theta + shift` (default 0). A positive value moves the
+#'   threshold up. Only for `rule = "cheung"`; `rule = "ms"` with a `shift`
+#'   other than 0 is an error. For a binary outcome, `theta + shift` must lie
+#'   strictly between 0 and 1.
 #' @param outcome `"binary"` (Beta priors `prior_a`, `prior_b`) or
 #'   `"normal"` (pooled-variance t posterior, with `sigma0` while there is no
 #'   variance estimate).
@@ -57,6 +74,7 @@ PipeDesign := new_class(
     grid = DoseGrid,
     target = new_property(class_character, default = "MTD"),
     theta = class_double,
+    shift = new_property(class_double, default = 0),
     outcome = new_property(class_character, default = "binary"),
     prior_a = new_property(class_double, default = 1),
     prior_b = new_property(class_double, default = 1),
@@ -91,18 +109,33 @@ design_list <- function(design) {
   for (nm in c("theta", "N")) {
     if (length(p[[nm]]) != 1L) stop(sprintf("`%s` must be a single number.", nm), call. = FALSE)
   }
+  check_shift(p$shift, p$theta, outcome, p$rule)
   p$model <- if (outcome == "binary") {
     for (prior in list(p$prior_a, p$prior_b)) {
       if (!length(prior) %in% c(1L, n_combos(p$grid)) || any(prior <= 0)) {
         stop("Beta priors must be positive, one per combination or one for all.", call. = FALSE)
       }
     }
-    outcome_beta(p$theta, p$prior_a, p$prior_b)
+    outcome_beta(p$theta, p$prior_a, p$prior_b, p$shift)
   } else {
-    outcome_normal(p$theta, p$sigma0)
+    outcome_normal(p$theta, p$sigma0, p$shift)
   }
   if (p$rule != "ms") p["safety"] <- list(NULL)
   do.call(pipe_trial_design, p[intersect(names(p), names(formals(pipe_trial_design)))])
+}
+
+# `shift` must be a single finite number. The Mander & Sweeting rule has no
+# shift, and a binary threshold theta + shift must lie in (0, 1).
+check_shift <- function(shift, theta, outcome, rule) {
+  if (length(shift) != 1L || !is.finite(shift)) {
+    stop("`shift` must be a single finite number.", call. = FALSE)
+  }
+  if (rule == "ms" && shift != 0) {
+    stop("`shift` is for rule = \"cheung\" only; the M&S rule has no shift.", call. = FALSE)
+  }
+  if (outcome == "binary" && !(theta + shift > 0 && theta + shift < 1)) {
+    stop("`theta` + `shift` must lie strictly between 0 and 1 for a binary outcome.", call. = FALSE)
+  }
 }
 
 #' Convenience constructors for the two PIPE designs
@@ -177,8 +210,9 @@ design_data <- function(design, data) {
 #' PIPE estimate and next dose
 #'
 #' `estimate()` gives the PIPE estimate from the data so far: which
-#' combinations exceed `theta`, and the design's final dose set (MTD or MED
-#' set for Cheung designs, recommended phase II doses for M&S designs).
+#' combinations exceed the decision threshold `theta + shift`, and the
+#' design's final dose set (MTD or MED set for Cheung designs, recommended
+#' phase II doses for M&S designs).
 #' `next_dose()` gives the doses the design may give next, with their
 #' probabilities, and draws one.
 #'
@@ -188,8 +222,9 @@ design_data <- function(design, data) {
 #'   the outcome. `NULL` before any patient.
 #' @param ... Not used.
 #' @return `estimate()`: a `PipeEstimate` with properties `p` (posterior
-#'   probability of exceeding `theta`), `gamma` (0/1 estimate), `q` (M&S
-#'   safety probabilities, or `NULL`), `set` and `pick` (Riviere's single dose,
+#'   probability of exceeding the decision threshold, P(parameter > `theta` +
+#'   `shift` | data)), `gamma` (0/1
+#'   estimate), `q` (M&S safety probabilities, or `NULL`), `set` and `pick` (Riviere's single dose,
 #'   binary MTD designs only), indices into the grid's combinations.
 #'   `next_dose()`: a list with `dose` (index, `NA` when the trial stops),
 #'   `label`, `stopped`, and `candidates`, a data frame of the candidate doses
@@ -262,9 +297,12 @@ method(next_dose, PipeDesign) <- function(design, data = NULL) {
 method(print, PipeEstimate) <- function(x, ...) {
   grid <- x@design@grid
   labels <- combo_labels(grid)
-  cat(sprintf("PIPE estimate (%s, theta = %g)\n", x@design@target, x@design@theta))
+  shift <- x@design@shift
+  cat(sprintf("PIPE estimate (%s, theta = %g%s)\n", x@design@target, x@design@theta,
+              if (shift != 0) sprintf(", shift = %g", shift) else ""))
   if (length(grid@levels) == 2L) {
-    cat("gamma (1 = above theta), rows = ", names(grid@levels)[1], " levels:\n", sep = "")
+    cat("gamma (1 = above ", if (shift != 0) "theta + shift" else "theta", "), rows = ",
+        names(grid@levels)[1], " levels:\n", sep = "")
     print(grid_as_array(grid, x@gamma))
   }
   what <- if (x@design@rule == "ms") "Recommended phase II doses" else paste(x@design@target, "set")

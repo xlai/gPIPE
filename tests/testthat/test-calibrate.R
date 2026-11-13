@@ -83,3 +83,21 @@ test_that("calibrate_eps() has a default band of 0.1 for binary outcomes, settab
   expect_equal(calibrate_eps(des, n_scenarios = 2, nsim = 5, alpha = 0.999, seed = 1)@band, 0.1)
   expect_equal(calibrate_eps(des, n_scenarios = 2, nsim = 5, alpha = 0.999, band = 0.15, seed = 1)@band, 0.15)
 })
+
+test_that("calibrate_eps() keeps the truths at theta +- band for a design with a shift", {
+  des <- cheung_design(DoseGrid(levels = c(A = 3, B = 3)), theta = 0.3, eps = 0.5, target = "MTD",
+                       outcome = "binary", prior_a = 0.3, prior_b = 0.7, N = 12, cohort = 3,
+                       shift = 0.1)
+  seen <- list()
+  pipe_simulate_orig <- pipe_simulate
+  local_mocked_bindings(pipe_simulate = function(design, truth, ...) {
+    seen[[length(seen) + 1L]] <<- list(truth = truth)
+    pipe_simulate_orig(design, truth, ...)
+  })
+  cal <- calibrate_eps(des, scenarios = list(rep(0L, 9), rep(1L, 9)), band = 0.1, nsim = 3,
+                       tol = 0.4, seed = 1)
+  expect_s3_class(cal, "gPIPE::PipeCalibration")
+  expect_equal(seen[[1]]$truth, rep(0.2, 9))
+  expect_equal(seen[[2]]$truth, rep(0.4, 9))
+  expect_equal(cal@design@shift, 0.1)
+})

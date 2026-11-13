@@ -19,8 +19,9 @@ the outcome. \code{NULL} before any patient.}
 }
 \value{
 \code{estimate()}: a \code{PipeEstimate} with properties \code{p} (posterior
-probability of exceeding \code{theta}), \code{gamma} (0/1 estimate), \code{q} (M&S
-safety probabilities, or \code{NULL}), \code{set} and \code{pick} (Riviere's single dose,
+probability of exceeding the decision threshold, P(parameter > \code{theta} +
+\code{shift} | data)), \code{gamma} (0/1
+estimate), \code{q} (M&S safety probabilities, or \code{NULL}), \code{set} and \code{pick} (Riviere's single dose,
 binary MTD designs only), indices into the grid's combinations.
 \code{next_dose()}: a list with \code{dose} (index, \code{NA} when the trial stops),
 \code{label}, \code{stopped}, and \code{candidates}, a data frame of the candidate doses
@@ -28,8 +29,9 @@ and their probabilities.
 }
 \description{
 \code{estimate()} gives the PIPE estimate from the data so far: which
-combinations exceed \code{theta}, and the design's final dose set (MTD or MED
-set for Cheung designs, recommended phase II doses for M&S designs).
+combinations exceed the decision threshold \code{theta + shift}, and the
+design's final dose set (MTD or MED set for Cheung designs, recommended
+phase II doses for M&S designs).
 \code{next_dose()} gives the doses the design may give next, with their
 probabilities, and draws one.
 }
