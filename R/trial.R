@@ -13,7 +13,12 @@
 #   Algorithm 1-EQ) or proportional to the probability of the favourable
 #   state ("prob"). For MED this is Cheung's Algorithm 1-PP (proportional to
 #   p_jk); for MTD, proportional to 1 - p_jk is gPIPE's own generalisation.
-#   The final estimate uses eps.
+#   Three more weightings are gPIPE's own: "fewest" (equal probability on the
+#   candidates with the fewest patients so far), "inverse_n" (proportional to
+#   1 / (n + 1)) and "interval" (proportional to the posterior probability
+#   that the parameter is within delta of theta; binary outcome only). The
+#   sampling set is the same for all of them. When every weight is 0, the
+#   weights are equal. The final estimate uses eps.
 # - "ms": Mander & Sweeting (2015) as pipe.design 0.5.1 runs it, through
 #   ms_decide(). The trial stops early only through the safety rule, and then
 #   gives no RP2D.
@@ -72,11 +77,17 @@ pipe_trial_design <- function(grid, model, target = c("MTD", "MED"), N, cohort =
   if (!(N >= 1 && cohort >= 1)) {
     stop("`N` and `cohort` must be at least 1.", call. = FALSE)
   }
+  if (length(delta) != 1L || !is.finite(delta) || delta < 0) {
+    stop("`delta` must be a single number, 0 or more.", call. = FALSE)
+  }
   check_eps(eps)
   weights <- weights %||% if (rule == "cheung") "n+1" else "1"
   selection <- selection %||% if (rule == "cheung") "equal" else "min_S"
   if (rule == "cheung") {
-    selection <- match.arg(selection, c("equal", "prob"))
+    selection <- match.arg(selection, c("equal", "prob", "fewest", "inverse_n", "interval"))
+    if (selection == "interval" && model$family != "binary") {
+      stop("`selection = \"interval\"` needs a binary outcome model.", call. = FALSE)
+    }
   } else {
     selection <- match.arg(selection, c("min_S", "inverse_S", "equal", "inverse_sqrt_S"))
   }
@@ -137,8 +148,19 @@ trial_step <- function(design, n, s1, s2, history) {
     eps_n <- if (design$taper) taper_eps(sum(n), design$N, design$eps) else design$eps
     gamma <- trial_estimate(design, p, n, eps_n)
     cand <- cheung_candidates(design$g, gamma)
-    fav <- if (design$target == "MED") p[cand] else 1 - p[cand]
-    prob[cand] <- if (design$selection == "equal" || !any(fav > 0)) 1 else fav
+    w <- switch(design$selection,
+      equal = 1,
+      prob = if (design$target == "MED") p[cand] else 1 - p[cand],
+      fewest = as.numeric(n[cand] == min(n[cand])),
+      inverse_n = 1 / (n[cand] + 1),
+      interval = {
+        model <- design$model
+        beta_interval_prob(model$theta, design$delta,
+                           rep_len(model$a, K)[cand] + s1[cand],
+                           rep_len(model$b, K)[cand] + n[cand] - s1[cand])
+      }
+    )
+    prob[cand] <- if (any(w > 0)) w else 1
     return(list(p = p, gamma = gamma, prob = prob / sum(prob), stopped = FALSE))
   }
   model <- design$model
