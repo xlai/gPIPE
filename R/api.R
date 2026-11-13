@@ -32,8 +32,9 @@
 #' @param N,cohort Maximum number of patients and cohort size.
 #' @param start Index of the first combination; `NULL` for the default (top
 #'   dose for Cheung MED designs, combination 1 otherwise).
-#' @param delta,within_set Riviere's single pick: the interval half-width and
-#'   whether to pick within the final set or among all tried doses.
+#' @param delta,within_set The single pick: the interval half-width of
+#'   Riviere's rule (not used when `pick = "isotonic"`) and whether to pick
+#'   within the final set or among all tried doses.
 #' @param pick How the single dose is chosen: `"interval"` (Riviere's
 #'   interval rule, the default) or `"isotonic"` (the tried dose whose
 #'   weighted isotonic estimate of the toxicity rate, under the dose order of
@@ -186,8 +187,8 @@ design_data <- function(design, data) {
 #' @param ... Not used.
 #' @return `estimate()`: a `PipeEstimate` with properties `p` (posterior
 #'   probability of exceeding `theta`), `gamma` (0/1 estimate), `q` (M&S
-#'   safety probabilities, or `NULL`), `set` and `pick` (Riviere's single dose,
-#'   binary MTD designs only), indices into the grid's combinations.
+#'   safety probabilities, or `NULL`), `set` and `pick` (the single
+#'   recommended dose, by the design's `pick` rule; binary MTD designs only), indices into the grid's combinations.
 #'   `next_dose()`: a list with `dose` (index, `NA` when the trial stops),
 #'   `label`, `stopped`, and `candidates`, a data frame of the candidate doses
 #'   and their probabilities.
