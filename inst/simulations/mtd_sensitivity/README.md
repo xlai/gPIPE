@@ -231,6 +231,9 @@ with `pct_` are percentages. The others are counts.
   `pct_pick_over` (pick at true toxicity 0.45 or more), `pct_pick_under`
   (0.15 or less), `pct_no_pick`, and `pct_pick_<combination>` for each of
   the 15 combinations.
+- `mtd_exposure.csv`: `id`, `pct_trials_ever_055`, `pct_trials_ever_045`,
+  `mean_n_at_045plus`, `mean_n_at_mtd`, for the closest rows and their
+  partners (see below).
 
 ## Isotonic pick (#54)
 
@@ -246,6 +249,32 @@ pick does not change how patients are treated or the final set, so FDR and
 TPR agree with the partner's up to Monte Carlo error; PCS, the pick classes
 and the cohorts of the pick differ. `report.R` has an "Isotonic pick"
 section with the pairs.
+
+## Closest-to-target selection (#57)
+
+`selection = "closest"` (rule "cheung") sends the next cohort to the dose of
+the sampling set whose isotonic estimate of the toxicity rate is closest to
+theta. The 12 rows of factor `closest` (seeds 4570 to 4581) all have
+`selection = "closest"` and `within_set = FALSE`, and `pick = "isotonic"`
+except `closest_interval` (interval pick, to separate the two changes).
+`closest_iso` has the baseline settings; the others change one thing as their
+id says (`_startup`, `_eps_0.3`, `_eps_0.5`, `_alpha_0.10` for the epsilon of
+that calibration, 0.217, `_taper_off`, `_weights_1`, `_prior_strength_1`,
+`_N_30`, `_N_120`, `_cohort_1`). The partner of each row (same conduct, equal
+selection) is in `mtd_closest_partners()`: the `_iso` row of the same
+setting, `single_pick_off` for `closest_interval`, and `alpha_0.10` for
+`closest_iso_alpha_0.10`, which has no isotonic partner (the nearest differs
+in the pick and in `within_set`).
+
+`results/mtd_exposure.csv` holds four safety numbers per row: the percentage
+of trials that treat at least one cohort at true toxicity 0.55 or more
+(`pct_trials_ever_055`) or 0.45 or more (`pct_trials_ever_045`), the mean
+patients per trial at 0.45 or more (`mean_n_at_045plus`), and the mean
+patients at the three true MTDs (`mean_n_at_mtd`). `run.R` writes it for the
+closest rows. `exposure_partners.R` adds the partner rows: it re-simulates them
+with their stored seeds, stops unless the PCS equals the stored PCS, and does
+not change their stored results. `report.R` has a "Closest-to-target
+selection" section with the pairs.
 
 ## Seeds
 
@@ -264,6 +293,8 @@ From this folder:
     Rscript run.R 4              # all configurations, about 4 minutes on 4 cores
     Rscript run.R 4 eps_0.5      # only these, and only their rows change
     Rscript run.R 4 single_pick_off_iso   # an isotonic row; also writes results/mtd_pick_classes.csv
+    Rscript run.R 4 closest_iso           # a closest row; also writes results/mtd_exposure.csv
+    Rscript exposure_partners.R 4         # exposure of the partner rows (re-simulated, PCS checked)
     Rscript report.R [id]        # tables; grids for one configuration
 
 Run times for 10000 trials: about 25 seconds per row, `cohort_1` about 75
