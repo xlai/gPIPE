@@ -34,8 +34,9 @@
 #   rule:          "cheung" or "ms";
 #   eps, taper, weights, selection: as described above; selection = "closest"
 #     (cheung, binary MTD only) gives the candidates whose isotonic estimate is
-#     closest to theta (untried: theta) equal weight and the rest 0; "ms" always uses
-#     eps = 0.5 and w = 1 (other values are an error), and selection is one of
+#     closest to theta (untried: theta) equal weight and the rest 0; "ms"
+#     always uses eps = 0.5 and w = 1 (other values are an error), and
+#     selection is one of
 #     ms_selection_weights()'s ("min_S" by default);
 #   admis, constraint, safety: M&S options, see ms_decide();
 #   delta, within_set: Riviere single pick, see riviere_pick();

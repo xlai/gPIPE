@@ -59,15 +59,15 @@ beta_interval_prob <- function(theta, delta, a, b) {
   stats::pbeta(theta + delta, a, b) - stats::pbeta(theta - delta, a, b)
 }
 
+# The elements of `pool` whose distance `dist` to the target is smallest (up to
+# a tolerance).
+closest_to <- function(dist, pool) pool[dist <= min(dist) + 1e-9]
+
 # Single dose by the isotonic rule (#54): among the candidates (tried doses,
 # and within `set` when `within_set`), the one whose isotonic estimate of the
 # toxicity rate is closest to theta. Estimates within 1e-9 of the smallest
 # distance tie; ties go to the dose with more patients, then to the smaller
 # index. Returns NA when there is no candidate.
-# The elements of `pool` whose distance `dist` to the target is smallest (up to
-# a tolerance).
-closest_to <- function(dist, pool) pool[dist <= min(dist) + 1e-9]
-
 isotonic_pick <- function(grid, set, theta, n, x, within_set = TRUE) {
   tried <- which(n > 0)
   pool <- if (within_set) tried[tried %in% set] else tried

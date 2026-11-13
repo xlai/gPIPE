@@ -309,3 +309,19 @@ test_that("closest simulates and summarises; equal is unchanged (values from bef
   expect_equal(sim, pipe_simulate(design("closest"), tr, 30, seed = 5))
   expect_no_error(capture.output(print(summary(sim))))
 })
+
+test_that("closest runs on a subset grid and for three drugs, with the taper on", {
+  keep <- matrix(TRUE, 3, 4)
+  keep[3, 4] <- FALSE
+  grids <- list(DoseGrid(levels = c(3, 4), keep = keep), DoseGrid(levels = c(2, 2, 3)))
+  for (g in grids) {
+    K <- n_combos(g)
+    d <- pipe_trial_design(g, outcome_beta(0.3, 0.05, 0.05), "MTD", N = 24, cohort = 3,
+                           eps = 0.2, selection = "closest")
+    sim <- pipe_simulate(d, seq(0.05, 0.6, length.out = K), 20, seed = 3)
+    expect_true(all(sim$summary$n_enrolled == 24))
+    # the first cohort is at the start dose, and every dose given is in the grid
+    expect_true(all(sim$n[, 1] >= 3))
+    expect_equal(sum(sim$n), 20 * 24)
+  }
+})
