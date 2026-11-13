@@ -13,7 +13,16 @@
 #   Algorithm 1-EQ) or proportional to the probability of the favourable
 #   state ("prob"). For MED this is Cheung's Algorithm 1-PP (proportional to
 #   p_jk); for MTD, proportional to 1 - p_jk is gPIPE's own generalisation.
-#   The final estimate uses eps.
+#   The final estimate uses eps. With startup = "diagonal" the trial first
+#   runs a start-up phase (Riviere et al. 2014, Section 2.1.3, binary MTD only):
+#   the first cohort is treated at `start`, and while no toxicity has been seen
+#   each next cohort goes one level up in every drug that is not at its top
+#   level. No random number is drawn for these doses. The phase ends for good
+#   when a toxicity is observed, when the current combination has every drug at
+#   its top level, or when the next combination is not in the grid. From then
+#   on the usual rule runs on all the data. The path of the phase depends only
+#   on the grid and `start`, so it is made once in pipe_trial_design() as
+#   `startup_path`, and the loop only counts cohorts along it.
 # - "ms": Mander & Sweeting (2015) as pipe.design 0.5.1 runs it, through
 #   ms_decide(). The trial stops early only through the safety rule, and then
 #   gives no RP2D.
@@ -31,12 +40,15 @@
 #     eps = 0.5 and w = 1 (other values are an error), and selection is one of
 #     ms_selection_weights()'s ("min_S" by default);
 #   admis, constraint, safety: M&S options, see ms_decide();
-#   delta, within_set: Riviere single pick, see riviere_pick().
+#   delta, within_set: Riviere single pick, see riviere_pick();
+#   startup:       "none" or "diagonal" (see above). The design holds
+#                  `startup_path`, the combinations of the start-up phase in
+#                  order (NULL for "none").
 pipe_trial_design <- function(grid, model, target = c("MTD", "MED"), N, cohort = 1L,
                               start = NULL, rule = c("cheung", "ms"), eps = 0.5, taper = TRUE,
                               weights = NULL, selection = NULL, admis = "closest",
                               constraint = "neighbouring", safety = 0.8, delta = 0.1,
-                              within_set = TRUE) {
+                              within_set = TRUE, startup = "none") {
   target <- match.arg(target)
   rule <- match.arg(rule)
   g <- grid_plain(grid)
@@ -66,6 +78,15 @@ pipe_trial_design <- function(grid, model, target = c("MTD", "MED"), N, cohort =
     stop("`N` and `cohort` must be at least 1.", call. = FALSE)
   }
   check_eps(eps)
+  if (!is.character(startup) || length(startup) != 1L || !startup %in% c("none", "diagonal")) {
+    stop("`startup` must be \"none\" or \"diagonal\".", call. = FALSE)
+  }
+  if (startup == "diagonal" &&
+      (rule != "cheung" || model$family != "binary" || target != "MTD")) {
+    stop("`startup = \"diagonal\"` needs rule = \"cheung\", a binary outcome and target = \"MTD\".",
+         call. = FALSE)
+  }
+  startup_path <- if (startup == "diagonal") startup_path(g, as.integer(start))
   weights <- weights %||% if (rule == "cheung") "n+1" else "1"
   selection <- selection %||% if (rule == "cheung") "equal" else "min_S"
   if (rule == "cheung") {
@@ -76,13 +97,49 @@ pipe_trial_design <- function(grid, model, target = c("MTD", "MED"), N, cohort =
   list(grid = grid, g = g, model = model, target = target, N = as.integer(N),
        cohort = as.integer(cohort), start = as.integer(start), rule = rule, eps = eps,
        taper = isTRUE(taper), weights = weights, selection = selection, admis = admis,
-       constraint = constraint, safety = safety, delta = delta, within_set = within_set)
+       constraint = constraint, safety = safety, delta = delta, within_set = within_set,
+       startup = startup, startup_path = startup_path)
+}
+
+# Combinations of the diagonal start-up phase, in order, from `start`: each
+# step raises every drug that is not at its top level by one. The path stops
+# when every drug is at its top level or the next combination is not in the
+# grid.
+startup_path <- function(g, start) {
+  path <- start
+  repeat {
+    lev <- g$combos[path[length(path)], ]
+    if (all(lev >= g$levels)) break
+    nxt <- g$lookup[matrix(lev + (lev < g$levels), nrow = 1L)]
+    if (is.na(nxt)) break
+    path <- c(path, nxt)
+  }
+  path
+}
+
+# The next start-up combination for real data (history = the combination of
+# each patient so far, in order; s1 = events per combination), or NA when the
+# phase is not active: there was a toxicity, the data are not on the start-up
+# path (patient i of cohort size `cohort` must be at path[ceiling(i / cohort)]),
+# or the path is used up. A partly filled cohort stays on its combination.
+startup_next <- function(design, history, s1) {
+  path <- design$startup_path
+  n <- length(history)
+  j <- n %/% design$cohort + 1L
+  if (is.null(path) || sum(s1) > 0 || j > length(path)) {
+    return(NA_integer_)
+  }
+  if (n && !all(history == path[(seq_len(n) - 1L) %/% design$cohort + 1L])) {
+    return(NA_integer_)
+  }
+  path[j]
 }
 
 # One trial under `truth` (see the outcome models). Returns
 #   n, s1, s2:      data per combination at the end;
 #   doses:          the combination given to each cohort;
 #   n_enrolled:     patients enrolled;
+#   n_startup:      cohorts treated in the start-up phase (0 without one);
 #   stopped:        TRUE when the trial stopped before N (M&S safety rule);
 #   gamma:          the final PIPE estimate (gamma = 1: exceeds theta);
 #   final_set:      maximal safe doses (MTD) or minimal effective doses (MED)
@@ -97,6 +154,9 @@ pipe_trial <- function(design, truth) {
   doses <- integer()
   dose <- design$start
   stopped <- FALSE
+  path <- design$startup_path
+  active <- !is.null(path)
+  n_startup <- 0L
 
   repeat {
     size <- min(design$cohort, N - sum(n))
@@ -105,7 +165,16 @@ pipe_trial <- function(design, truth) {
     s1[dose] <- s1[dose] + sum(y)
     s2[dose] <- s2[dose] + sum(y^2)
     doses <- c(doses, dose)
+    if (active) n_startup <- n_startup + 1L
     if (sum(n) >= N) break
+    if (active) {
+      # the phase goes on only with no toxicity and a next start-up combination
+      active <- sum(s1) == 0 && n_startup < length(path)
+      if (active) {
+        dose <- path[n_startup + 1L]
+        next
+      }
+    }
     step <- trial_step(design, n, s1, s2, doses)
     if (step$stopped) {
       stopped <- TRUE
@@ -113,7 +182,8 @@ pipe_trial <- function(design, truth) {
     }
     dose <- draw_dose(seq_len(K), step$prob)
   }
-  c(list(n = n, s1 = s1, s2 = s2, doses = doses, n_enrolled = sum(n), stopped = stopped),
+  c(list(n = n, s1 = s1, s2 = s2, doses = doses, n_enrolled = sum(n), n_startup = n_startup,
+         stopped = stopped),
     trial_final(design, n, s1, s2, doses, stopped)[c("gamma", "final_set", "pick")])
 }
 
@@ -185,7 +255,7 @@ draw_dose <- function(x, prob) {
 # keep_trials) and, over trials x combinations, the patients (`n`), the
 # events or outcome sums (`s1`), the final estimate (`gamma`) and the
 # final-set membership (`final_set`); and a data frame with n_enrolled,
-# stopped and pick per trial.
+# n_startup, stopped and pick per trial.
 pipe_simulate <- function(design, truth, n_trials, seed = NULL, keep_trials = TRUE) {
   if (!is.null(seed)) set.seed(seed)
   K <- design$g$K
@@ -200,6 +270,7 @@ pipe_simulate <- function(design, truth, n_trials, seed = NULL, keep_trials = TR
     summary = data.frame(
       trial = seq_len(n_trials),
       n_enrolled = vapply(trials, function(t) t$n_enrolled, numeric(1)),
+      n_startup = vapply(trials, function(t) t$n_startup, integer(1)),
       stopped = vapply(trials, function(t) t$stopped, logical(1)),
       pick = vapply(trials, function(t) t$pick, integer(1))
     )

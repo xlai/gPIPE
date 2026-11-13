@@ -148,3 +148,59 @@ test_that("simulate runs trials and keeps them only when asked", {
   s <- simulate(ch, nsim = 3, seed = 2, truth = list(mean = matrix(1:9 / 9, 3), sd = 0.5))
   expect_equal(s@summary$n_enrolled, rep(12, 3))
 })
+
+update_none <- function(des) {
+  PipeDesign(grid = des@grid, theta = des@theta, N = des@N, outcome = "binary", target = "MTD",
+             rule = "cheung", eps = des@eps, cohort = des@cohort)
+}
+
+test_that("next_dose follows the start-up phase and then the usual rule", {
+  des <- PipeDesign(grid = DoseGrid(levels = c(A = 5, B = 3)), theta = 0.3, N = 20,
+                    outcome = "binary", target = "MTD", rule = "cheung", eps = 0.25,
+                    startup = "diagonal")
+  expect_equal(des@startup, "diagonal")
+  expect_equal(next_dose(des)$dose, 1L)
+  dat <- data.frame(A = c(1, 2), B = c(1, 2), y = c(0, 0))
+  nd <- next_dose(des, dat)
+  expect_equal(nd$dose, 13L)  # (3,3)
+  expect_equal(nd$candidates$prob, 1)
+  expect_false(nd$stopped)
+  # the last start-up combination, then the usual rule
+  dat5 <- data.frame(A = c(1, 2, 3, 4), B = c(1, 2, 3, 3), y = 0)
+  expect_equal(next_dose(des, dat5)$dose, 15L)
+  usual <- rbind(dat5, data.frame(A = 5, B = 3, y = 0))
+  expect_gt(nrow(next_dose(des, usual)$candidates), 0)
+  expect_equal(next_dose(des, usual)$candidates$prob, next_dose(update_none(des), usual)$candidates$prob)
+  # a toxicity ends the phase
+  tox <- data.frame(A = c(1, 2), B = c(1, 2), y = c(0, 1))
+  expect_equal(next_dose(des, tox)$candidates$prob,
+               next_dose(update_none(des), tox)$candidates$prob)
+  # data off the path end the phase too
+  off <- data.frame(A = c(1, 3), B = c(1, 1), y = c(0, 0))
+  expect_equal(next_dose(des, off)$candidates$prob,
+               next_dose(update_none(des), off)$candidates$prob)
+  # cohorts of 2: the second patient of a cohort stays on its combination
+  des2 <- PipeDesign(grid = DoseGrid(levels = c(A = 5, B = 3)), theta = 0.3, N = 20,
+                     outcome = "binary", target = "MTD", rule = "cheung", eps = 0.25,
+                     startup = "diagonal", cohort = 2)
+  expect_equal(next_dose(des2, data.frame(A = 1, B = 1, y = 0))$dose, 1L)
+  expect_equal(next_dose(des2, data.frame(A = c(1, 1), B = c(1, 1), y = 0))$dose, 7L)
+  expect_equal(next_dose(des2, data.frame(A = c(1, 1, 2), B = c(1, 1, 2), y = 0))$dose, 7L)
+})
+
+test_that("PipeDesign checks the start-up option, and summary and plot work with it", {
+  g <- DoseGrid(levels = c(A = 4, B = 4))
+  mk <- function(...) PipeDesign(grid = g, theta = 0.3, N = 20, ...)
+  expect_error(mk(startup = "diagonal", outcome = "binary", target = "MTD", rule = "ms"),
+               "startup")
+  expect_error(mk(startup = "diagonal", outcome = "normal", target = "MTD"), "binary")
+  expect_error(mk(startup = "diagonal", outcome = "binary", target = "MED"), "MTD")
+  expect_error(mk(startup = "x", outcome = "binary", target = "MTD"), "none")
+  des <- mk(startup = "diagonal", outcome = "binary", target = "MTD", eps = 0.25, cohort = 2)
+  truth <- c(outer(seq(0.05, 0.35, length.out = 4), seq(0, 0.3, length.out = 4), `+`))
+  sim <- simulate(des, nsim = 10, seed = 3, truth = truth)
+  expect_true(all(sim@summary$n_startup >= 1))
+  expect_true(S7::S7_inherits(summary(sim), PipeSummary))
+  skip_if_not_installed("ggplot2")
+  expect_s3_class(plot(sim), "ggplot")
+})
