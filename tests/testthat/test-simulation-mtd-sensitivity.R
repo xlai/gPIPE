@@ -1,10 +1,11 @@
-# Stored results of the MTD component sensitivity study (#45, steps 1 and 2).
+# Stored results of the MTD component sensitivity study (#45).
 #
 # The results are stored in inst/simulations/mtd_sensitivity/results: the
-# calibrations of epsilon (three values of alpha), and 10000 trials of each
-# configuration (the baseline, the one-factor-at-a-time rows and the Mander &
-# Sweeting design) on Riviere et al.'s scenario 1. The scripts beside them make the runs
-# again. This checks the stored files only, so it does not change when the
+# calibrations of epsilon (three values of alpha, four band shifts), and
+# 10000 trials of each configuration (the baseline, the one-factor-at-a-time
+# rows, the selection, band shift and exploratory combination rows, and the
+# Mander & Sweeting design) on Riviere et al.'s scenario 1. The scripts
+# beside them make the runs again. This checks the stored files only, so it does not change when the
 # package code changes.
 
 mtd_dir <- function() system.file("simulations", "mtd_sensitivity", package = "gPIPE")
@@ -14,9 +15,10 @@ test_that("the stored MTD sensitivity results are complete and consistent", {
   skip_if(mtd_dir() == "", "simulation results are not installed")
   rdir <- file.path(mtd_dir(), "results")
   read <- function(f, ...) utils::read.csv(file.path(rdir, f), ...)
+  shifts <- c("0.1", "0.075", "0.05", "0.025")
   for (f in c("mtd_sensitivity.csv", "mtd_sensitivity_runs.csv", "calibration_baseline.csv",
               "calibration_alpha_0.10.csv", "calibration_alpha_0.20.csv",
-              "riviere2014_scenario1_pcs.csv")) {
+              "riviere2014_scenario1_pcs.csv", sprintf("calibration_shift_%s.csv", shifts))) {
     expect_true(file.exists(file.path(rdir, f)), info = f)
   }
   res <- read("mtd_sensitivity.csv", colClasses = c(combo = "character"))
@@ -29,7 +31,11 @@ test_that("the stored MTD sensitivity results are complete and consistent", {
            "taper_off", "weights_1", "prior_strength_1", "prior_strength_4",
            "prior_beta_1_1", "prior_beta_0.5_0.5", "prior_correct", "prior_too_low",
            "prior_too_high", "prior_correct_strength_1", "selection_prob", "cohort_1",
-           "N_30", "N_120", "start_top", "single_pick_off")
+           "N_30", "N_120", "start_top", "single_pick_off",
+           "selection_fewest", "selection_inverse_n", "selection_interval",
+           "shift_0.1", "shift_0.075", "shift_0.05", "shift_0.025", "shift_0.1_eps_fixed",
+           "eps_0.4_pick_all", "eps_0.3_pick_all", "shift_0.1_pick_all",
+           "shift_0.1_pick_all_fewest", "shift_0.1_pick_all_interval", "shift_0.05_pick_all")
   expect_setequal(res$id, ids)
   expect_setequal(runs$id, ids)
   expect_equal(runs$nsim, rep(10000, length(ids)))
@@ -93,8 +99,8 @@ test_that("the stored MTD sensitivity results are complete and consistent", {
   }
 
   # Each calibration file has one selected epsilon, whose false discovery
-  # rate is within its alpha. Alpha grows with the file: 0.05, 0.10, 0.20,
-  # and so does the selected epsilon.
+  # rate is within its alpha. Alpha grows with the three alpha files: 0.05,
+  # 0.10, 0.20, and so does the selected epsilon.
   cals <- list(baseline = cal, alpha_0.10 = read("calibration_alpha_0.10.csv"),
                alpha_0.20 = read("calibration_alpha_0.20.csv"))
   for (nm in names(cals)) {
@@ -106,19 +112,55 @@ test_that("the stored MTD sensitivity results are complete and consistent", {
   sel <- vapply(cals, function(x) x$eps[x$selected], 0, USE.NAMES = FALSE)
   expect_true(all(diff(sel) > 0))
 
+  # The shift calibrations: alpha 0.05, and the band and the shift of the
+  # file name (the shift is the band). The older files have no shift column
+  # and shift 0, with band 0.1. The selected epsilon is a tried value with
+  # an FDR within alpha, and it is one value in the file.
+  scals <- lapply(setNames(shifts, shifts), function(b) read(sprintf("calibration_shift_%s.csv", b)))
+  for (b in shifts) {
+    cl <- scals[[b]]
+    expect_equal(unique(cl$band), as.numeric(b), info = b)
+    expect_equal(unique(cl$shift), as.numeric(b), info = b)
+    expect_equal(unique(cl$alpha), 0.05, info = b)
+    expect_equal(sum(cl$selected), 1, info = b)
+    expect_lte(cl$fdr[cl$selected], 0.05)
+    expect_equal(unique(cl$n_scenarios), 56, info = b)
+  }
+  for (cl in cals) {
+    expect_equal(unique(cl$band), 0.1)
+    expect_false("shift" %in% names(cl))
+  }
+  sel_shift <- vapply(scals, function(x) x$eps[x$selected], 0)
+
   # Rows that use a calibrated epsilon used the one selected in their file:
   # the baseline and every row that keeps its epsilon use the baseline
-  # calibration, and the two alpha rows use their own. Fixed-epsilon rows
-  # have the value in their id, and the M&S row has none.
+  # calibration, the two alpha rows use their own, and each shift row uses
+  # the calibration of its shift. Fixed-epsilon rows have the value in their
+  # id, the M&S row has none, and the fixed-epsilon shift row keeps the
+  # baseline epsilon.
   eps_of <- function(id) runs$eps[runs$id == id]
-  fixed <- c(eps_0.5 = 0.5, eps_0.4 = 0.4, eps_0.3 = 0.3, eps_0.15 = 0.15, eps_0.05 = 0.05)
+  fixed <- c(eps_0.5 = 0.5, eps_0.4 = 0.4, eps_0.3 = 0.3, eps_0.15 = 0.15, eps_0.05 = 0.05,
+             eps_0.4_pick_all = 0.4, eps_0.3_pick_all = 0.3)
   for (id in names(fixed)) expect_equal(eps_of(id), fixed[[id]], info = id)
   expect_true(is.na(eps_of("ref_ms")))
   expect_equal(eps_of("alpha_0.10"), sel[2])
   expect_equal(eps_of("alpha_0.20"), sel[3])
-  for (id in setdiff(ids, c(names(fixed), "ref_ms", "alpha_0.10", "alpha_0.20"))) {
-    expect_equal(eps_of(id), sel[1], info = id)
+  shift_of <- c(shift_0.1 = "0.1", shift_0.075 = "0.075", shift_0.05 = "0.05", shift_0.025 = "0.025",
+                shift_0.1_pick_all = "0.1", shift_0.1_pick_all_fewest = "0.1",
+                shift_0.1_pick_all_interval = "0.1", shift_0.05_pick_all = "0.05")
+  for (id in names(shift_of)) expect_equal(eps_of(id), sel_shift[[shift_of[[id]]]], info = id)
+  own <- c(names(fixed), "ref_ms", "alpha_0.10", "alpha_0.20", names(shift_of))
+  for (id in setdiff(ids, own)) expect_equal(eps_of(id), sel[1], info = id)
+
+  # Mechanism of the shift: with a shift of 0.1 and the same epsilon, a dose
+  # with truth 0.30 is called safe more often, so the true MTDs are in the
+  # final set more often than at the baseline. (With the smaller calibrated
+  # epsilon the two effects cancel, so only the fixed-epsilon row is checked.)
+  p_sel <- function(id) {
+    r <- res[res$id == id & res$metric == "pct_selected" & res$combo %in% mtd, ]
+    sum(r$estimate)
   }
+  expect_gt(p_sel("shift_0.1_eps_fixed"), p_sel("baseline"))
 
   # Riviere's published PCS for scenario 1 (percent): seven designs.
   expect_equal(nrow(ref), 7)

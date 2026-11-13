@@ -1,17 +1,18 @@
-# MTD component sensitivity study (issue #45, steps 1 to 3)
+# MTD component sensitivity study (issue #45)
 
 How much does each component of PIPE with epsilon-tapering matter for
 finding the maximum tolerated dose (MTD) contour with binary toxicity? This
-folder holds the baseline, two reference lines, and rows that change one
-factor at a time from the baseline. Factors that need a change in the
-package code come later.
+folder holds the baseline, two reference lines, rows that change one
+factor at a time from the baseline, rows for the selection rules and the
+band shift, and a few exploratory rows that change several things at once.
 
 - `common.R`: the scenario, the configuration table `mtd_configs()`, the
   design built from a row, and the summary of one simulation.
-- `calibrate.R`: calibrates epsilon for the baseline design, for a given alpha.
+- `calibrate.R`: calibrates epsilon for the baseline design, for a given
+  alpha, band and shift.
 - `run.R`: simulates configurations and stores the summaries.
 - `report.R`: prints the stored results by factor, with the difference from
-  the baseline.
+  the baseline, and a table of all rows sorted by PCS.
 - `results/`: the stored runs (see below).
 
 To add a configuration, add one row in `mtd_configs()` (with a new `id` and
@@ -68,7 +69,7 @@ column.
 ## One-factor-at-a-time rows
 
 Each row changes one thing from the baseline. **Every row keeps the baseline
-epsilon (0.113) except the epsilon rows and the calibration rows.** Epsilon
+epsilon (0.113) except the epsilon rows, the calibration rows and the band shift rows.** Epsilon
 is not recalibrated when N, the prior, the cohort size or any other factor
 changes. So a change in N or in the prior also changes the false discovery
 rate that epsilon was chosen to control, and the rows are not at equal FDR.
@@ -88,6 +89,40 @@ Compare the FDR column as well as PCS.
 | N | `N_30`, `N_120` |
 | start | `start_top`: start at A5.B3 (combination 15) |
 | single pick | `single_pick_off`: `within_set = FALSE` |
+
+## Selection, band shift and combination rows
+
+**Selection.** `selection_fewest`, `selection_inverse_n` and
+`selection_interval` use the other ways to draw the next dose from the
+sampling set (`selection = "fewest"`, `"inverse_n"`, `"interval"`). They keep
+the baseline epsilon.
+
+**Band shift.** The shift moves the decision threshold. The design decides
+with P(pi > theta + shift) instead of P(pi > theta). Theta stays the target:
+the single pick, `summary()` and `calibrate_eps()` still use 0.30. With a
+shift, a dose whose true toxicity is exactly 0.30 is called safe more often,
+so true MTDs are kept in the final set more often.
+
+The shift rows take the band b of the calibration as the shift. For
+b = 0.1, 0.075, 0.05 and 0.025, the design has `shift = b`, and epsilon is
+calibrated again for it with alpha = 0.05 and band = b over the same 56
+configurations. The simulated truths sit at theta +- b, so the toxic ones are
+exactly on the decision threshold theta + b. The prior stays the baseline's
+(median 0.30, strength 1/15). The calibrations are in
+`results/calibration_shift_<b>.csv` (columns `band` and `shift` record what
+they used). `summary()` is still called with band = 0.1 for every row, so
+FDR, TPR and PCS are on the same footing as the baseline.
+
+| factor | rows |
+|---|---|
+| selection | `selection_fewest`, `selection_inverse_n`, `selection_interval` |
+| band shift | `shift_0.1`, `shift_0.075`, `shift_0.05`, `shift_0.025`: shift b with epsilon calibrated at band b |
+| band shift, fixed eps | `shift_0.1_eps_fixed`: shift 0.1 with the baseline epsilon 0.113, to separate the effect of the shift from the effect of the new epsilon |
+| combination | `eps_0.4_pick_all`, `eps_0.3_pick_all` (epsilon 0.4 and 0.3 with `within_set = FALSE`); `shift_0.1_pick_all`, `shift_0.05_pick_all` (shift with its calibrated epsilon and `within_set = FALSE`); `shift_0.1_pick_all_fewest`, `shift_0.1_pick_all_interval` (as `shift_0.1_pick_all`, with selection `"fewest"` or `"interval"`) |
+
+The combination rows are exploratory. Each changes more than one thing from
+the baseline, so a difference cannot be put down to one factor. The
+`shift` column of the configuration table is 0 for every other row.
 
 The two other scenario truths are in `common.R` (`mtd_truth_s2`,
 `mtd_truth_s3`), copied from `riviere2014_scenarios_all14.csv` in the same
@@ -153,7 +188,9 @@ with `pct_` are percentages. The others are counts.
 - `mtd_sensitivity_runs.csv`: per configuration, trials, seed, epsilon used,
   and seconds.
 - `calibration_baseline.csv`, `calibration_alpha_0.10.csv`,
-  `calibration_alpha_0.20.csv`, `riviere2014_scenario1_pcs.csv`.
+  `calibration_alpha_0.20.csv`, `calibration_shift_0.1.csv`,
+  `calibration_shift_0.075.csv`, `calibration_shift_0.05.csv`,
+  `calibration_shift_0.025.csv`, `riviere2014_scenario1_pcs.csv`.
 
 ## Seeds
 
@@ -168,13 +205,14 @@ From this folder:
 
     Rscript calibrate.R          # baseline, alpha 0.05: about 10 minutes, one core
     Rscript calibrate.R 1 0.10 results/calibration_alpha_0.10.csv   # seed, alpha, file
+    Rscript calibrate.R 1 0.05 results/calibration_shift_0.1.csv 0.1 0.1   # ..., band, shift
     Rscript run.R 4              # all configurations, about 4 minutes on 4 cores
     Rscript run.R 4 eps_0.5      # only these, and only their rows change
     Rscript report.R [id]        # tables; grids for one configuration
 
 Run times for 10000 trials: about 25 seconds per row, `cohort_1` about 75
 seconds, `N_120` about 50 seconds, `ref_ms` about 230 seconds (the safety
-rule is slower). `run.R` needs the
-installed gPIPE.
+rule is slower). Each shift calibration takes about 10 minutes on one core; the four can run as
+parallel processes. `run.R` needs the installed gPIPE.
 
 `tests/testthat/test-simulation-mtd-sensitivity.R` checks the stored results.
