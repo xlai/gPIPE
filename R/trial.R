@@ -86,8 +86,8 @@ pipe_trial_design <- function(grid, model, target = c("MTD", "MED"), N, cohort =
   if (!is.character(startup) || length(startup) != 1L || !startup %in% c("none", "diagonal")) {
     stop("`startup` must be \"none\" or \"diagonal\".", call. = FALSE)
   }
-  if (startup == "diagonal" &&
-      (rule != "cheung" || model$family != "binary" || target != "MTD")) {
+  bad_startup <- rule != "cheung" || model$family != "binary" || target != "MTD"
+  if (startup == "diagonal" && bad_startup) {
     stop("`startup = \"diagonal\"` needs rule = \"cheung\", a binary outcome and target = \"MTD\".",
          call. = FALSE)
   }
