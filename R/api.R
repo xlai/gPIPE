@@ -34,6 +34,12 @@
 #'   dose for Cheung MED designs, combination 1 otherwise).
 #' @param delta,within_set Riviere's single pick: the interval half-width and
 #'   whether to pick within the final set or among all tried doses.
+#' @param pick How the single dose is chosen: `"interval"` (Riviere's
+#'   interval rule, the default) or `"isotonic"` (the tried dose whose
+#'   weighted isotonic estimate of the toxicity rate, under the dose order of
+#'   the grid, is closest to `theta`; ties go to the dose with more patients,
+#'   then to the lower index). `"isotonic"` is for binary outcomes and
+#'   `target = "MTD"` only.
 #' @return A `PipeDesign` object.
 #' @examples
 #' g <- DoseGrid(levels = c(A = 3, B = 3))
@@ -63,7 +69,8 @@ PipeDesign := new_class(
     cohort = new_property(class_numeric, default = 1),
     start = new_property(NULL | class_numeric, default = NULL),
     delta = new_property(class_double, default = 0.1),
-    within_set = new_property(class_logical, default = TRUE)
+    within_set = new_property(class_logical, default = TRUE),
+    pick = new_property(class_character, default = "interval")
   ),
   validator = function(self) {
     tryCatch({

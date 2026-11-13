@@ -54,6 +54,23 @@ riviere_pick <- function(set, theta, a, b, n, x, delta = 0.1, within_set = TRUE)
   pool[which.max(prob)]
 }
 
+# Single dose by the isotonic rule (#54): among the candidates (tried doses,
+# and within `set` when `within_set`), the one whose isotonic estimate of the
+# toxicity rate is closest to theta. Estimates within 1e-9 of the smallest
+# distance tie; ties go to the dose with more patients, then to the smaller
+# index. Returns NA when there is no candidate.
+isotonic_pick <- function(grid, set, theta, n, x, within_set = TRUE) {
+  tried <- which(n > 0)
+  pool <- if (within_set) tried[tried %in% set] else tried
+  if (!length(pool)) {
+    return(NA_integer_)
+  }
+  dist <- abs(isotonic_fit(grid, n, x)[pool] - theta)
+  pool <- pool[dist <= min(dist) + 1e-9]
+  pool <- pool[n[pool] == max(n[pool])]
+  pool[1L]
+}
+
 # ---- Mander & Sweeting (2015) -----------------------------------------------
 
 # Doses allowed by the constraint, given the doses given so far (`history`,

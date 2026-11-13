@@ -31,16 +31,23 @@
 #     eps = 0.5 and w = 1 (other values are an error), and selection is one of
 #     ms_selection_weights()'s ("min_S" by default);
 #   admis, constraint, safety: M&S options, see ms_decide();
-#   delta, within_set: Riviere single pick, see riviere_pick().
+#   delta, within_set: Riviere single pick, see riviere_pick();
+#   pick:          "interval" (Riviere's interval rule) or "isotonic" (the
+#                  tried dose whose isotonic estimate is closest to theta, see
+#                  isotonic_pick(); binary outcome and MTD only, #54).
 pipe_trial_design <- function(grid, model, target = c("MTD", "MED"), N, cohort = 1L,
                               start = NULL, rule = c("cheung", "ms"), eps = 0.5, taper = TRUE,
                               weights = NULL, selection = NULL, admis = "closest",
                               constraint = "neighbouring", safety = 0.8, delta = 0.1,
-                              within_set = TRUE) {
+                              within_set = TRUE, pick = c("interval", "isotonic")) {
   target <- match.arg(target)
   rule <- match.arg(rule)
+  pick <- match.arg(pick)
   g <- grid_plain(grid)
   g$key <- grid_key(g)
+  if (pick == "isotonic" && (model$family != "binary" || target != "MTD")) {
+    stop("The isotonic pick is for a binary outcome and MTD only.", call. = FALSE)
+  }
   if (rule == "ms" && model$family != "binary") {
     stop("The M&S rule needs a binary outcome model.", call. = FALSE)
   }
@@ -76,7 +83,8 @@ pipe_trial_design <- function(grid, model, target = c("MTD", "MED"), N, cohort =
   list(grid = grid, g = g, model = model, target = target, N = as.integer(N),
        cohort = as.integer(cohort), start = as.integer(start), rule = rule, eps = eps,
        taper = isTRUE(taper), weights = weights, selection = selection, admis = admis,
-       constraint = constraint, safety = safety, delta = delta, within_set = within_set)
+       constraint = constraint, safety = safety, delta = delta, within_set = within_set,
+       pick = pick)
 }
 
 # One trial under `truth` (see the outcome models). Returns
@@ -87,7 +95,8 @@ pipe_trial_design <- function(grid, model, target = c("MTD", "MED"), N, cohort =
 #   gamma:          the final PIPE estimate (gamma = 1: exceeds theta);
 #   final_set:      maximal safe doses (MTD) or minimal effective doses (MED)
 #                   for "cheung", the RP2D for "ms" (empty when stopped);
-#   pick:           single dose by Riviere's rule (binary MTD only, else NA).
+#   pick:           single dose by Riviere's rule or, with pick = "isotonic",
+#                   the isotonic rule (binary MTD only, else NA).
 pipe_trial <- function(design, truth) {
   model <- design$model
   K <- design$g$K
@@ -141,8 +150,8 @@ trial_step <- function(design, n, s1, s2, history) {
 }
 
 # Final estimate after the data so far: p, gamma (with eps itself), the final
-# set (MTD/MED set for "cheung", RP2D for "ms", empty when stopped), Riviere's
-# pick (binary MTD only, else NA) and, for "ms", q.
+# set (MTD/MED set for "cheung", RP2D for "ms", empty when stopped), the single
+# pick by `design$pick` (binary MTD only, else NA) and, for "ms", q.
 trial_final <- function(design, n, s1, s2, history, stopped = FALSE) {
   grid <- design$g
   model <- design$model
@@ -161,8 +170,12 @@ trial_final <- function(design, n, s1, s2, history, stopped = FALSE) {
   }
   pick <- NA_integer_
   if (model$family == "binary" && design$target == "MTD" && length(final_set)) {
-    pick <- riviere_pick(final_set, model$theta, model$a, model$b, n, s1,
-                         delta = design$delta, within_set = design$within_set)
+    pick <- if (design$pick == "isotonic") {
+      isotonic_pick(grid, final_set, model$theta, n, s1, within_set = design$within_set)
+    } else {
+      riviere_pick(final_set, model$theta, model$a, model$b, n, s1,
+                   delta = design$delta, within_set = design$within_set)
+    }
   }
   list(p = p, gamma = gamma, q = q, final_set = final_set, pick = pick)
 }
