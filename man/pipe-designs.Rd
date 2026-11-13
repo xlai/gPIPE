@@ -20,7 +20,8 @@ cheung_design(grid, theta, eps, target = "MED", outcome = "normal", ...)
 \arguments{
 \item{grid}{A \link{DoseGrid}.}
 
-\item{theta}{Target threshold.}
+\item{theta}{Target threshold. This is the clinical target, for example a
+toxicity of 0.3 for MTD.}
 
 \item{prior_median, prior_strength}{Prior median of each combination's
 toxicity probability and prior strength a + b (one per combination or one

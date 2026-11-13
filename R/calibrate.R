@@ -65,6 +65,11 @@ with_seed <- function(seed, expr) {
 #' outcomes. For normal outcomes the rest sit at `theta`, the least favourable
 #' null, and the others at `theta + band`. The band only sets how far apart the
 #' simulated truths are, so it also sets how hard the calibration is.
+#' The true values do not move with the design's `shift`; they stay around
+#' `theta`. With `shift` equal to `band`, the combinations above sit exactly at
+#' the decision threshold `theta + shift` (the least favourable case, as in
+#' Cheung's calibration for MED), and the others are two bands below it for
+#' binary outcomes (one band for normal outcomes).
 #'
 #' The false discovery rate rises with `eps`, so `eps` is found by bisection
 #' on `[lower, upper]`, not by a grid. Every evaluation uses the same seeds
