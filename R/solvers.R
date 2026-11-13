@@ -51,6 +51,46 @@ pipe_estimate <- function(grid, d, target = c("MTD", "MED")) {
   solve_mincut(grid, d, largest = target == "MTD")
 }
 
+# ---- Isotonic regression ----------------------------------------------------
+
+# Weighted isotonic regression of the raw rates s1 / n over the tried
+# combinations (n > 0) under the partial order of the grid, with weights n
+# (#54). Untried combinations get NA. They carry no data, but the order
+# between tried ones still runs through them, so they enter the min-cut with
+# gain 0.
+#
+# Recursive partitioning, with the min-cut as the only solver. A block of
+# tried combinations starts as one block at its pooled mean m. Its upper level
+# set {fit > m} is an up-set of the block that maximises sum(n (y - m)), the
+# same max-weight closure as the PIPE estimate with gain d = s1 - m n. The cut
+# at m splits the block into that up-set and the rest when the gain is
+# positive, and the two parts are fitted on their own. With no positive gain
+# the block is a level set with value m. Among tied optima any one splits the
+# block correctly (the true level sets lie between the smallest and the
+# largest), so the largest is used. The gain threshold is the solver's
+# tolerance.
+isotonic_fit <- function(grid, n, s1) {
+  grid <- grid_plain(grid)
+  fit <- rep(NA_real_, grid$K)
+  todo <- list(which(n > 0))
+  while (length(todo)) {
+    block <- todo[[length(todo)]]
+    todo[[length(todo)]] <- NULL
+    m <- sum(s1[block]) / sum(n[block])
+    if (length(block) > 1L) {
+      d <- numeric(grid$K)
+      d[block] <- s1[block] - m * n[block]
+      in_up <- solve_mincut(grid, d, largest = TRUE)[block] == 1L
+      if (sum(d[block][in_up]) > 1e-10 * (1 + max(abs(d)))) {
+        todo <- c(todo, list(block[in_up]), list(block[!in_up]))
+        next
+      }
+    }
+    fit[block] <- m
+  }
+  fit
+}
+
 # ---- Safety probabilities ---------------------------------------------------
 
 # Sweep plan of a grid. The sweep visits the combinations in list order, which

@@ -71,6 +71,12 @@
 #'   every drug at its top level; (c) the next combination is not in the grid
 #'   (a subset grid). No random number is drawn for the dose in the phase. It
 #'   needs `rule = "cheung"`, `outcome = "binary"` and `target = "MTD"`.
+#' @param pick How the single dose is chosen: `"interval"` (Riviere's
+#'   interval rule, the default) or `"isotonic"` (the tried dose whose
+#'   weighted isotonic estimate of the toxicity rate, under the dose order of
+#'   the grid, is closest to `theta`; ties go to the dose with more patients,
+#'   then to the lower index). `"isotonic"` is for binary outcomes and
+#'   `target = "MTD"` only.
 #' @return A `PipeDesign` object.
 #' @examples
 #' g <- DoseGrid(levels = c(A = 3, B = 3))
@@ -102,7 +108,8 @@ PipeDesign := new_class(
     start = new_property(NULL | class_numeric, default = NULL),
     delta = new_property(class_double, default = 0.1),
     within_set = new_property(class_logical, default = TRUE),
-    startup = new_property(class_character, default = "none")
+    startup = new_property(class_character, default = "none"),
+    pick = new_property(class_character, default = "interval")
   ),
   validator = function(self) {
     tryCatch({
