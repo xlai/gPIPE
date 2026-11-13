@@ -35,6 +35,17 @@ phase II doses for M&S designs).
 \code{next_dose()} gives the doses the design may give next, with their
 probabilities, and draws one.
 }
+\details{
+With \code{startup = "diagonal"} (see \link{PipeDesign}), \code{next_dose()}
+returns the next start-up combination with probability 1 while the data
+are consistent with the start-up phase being active: no toxicity so far,
+and the patients, in the order of the rows, are on the start-up path in
+cohorts of size \code{cohort} (patient \code{i} at step \code{ceiling(i / cohort)}). A
+cohort that is not yet full stays at its combination. If a toxicity was
+seen, the data leave the path, or the path is used up, the result is the
+usual one. The cohorts are found from the row order and the design's
+\code{cohort}, because the data do not record them.
+}
 \examples{
 g <- DoseGrid(levels = c(A = 3, B = 3))
 des <- ms_design(g, theta = 0.3, prior_median = 0.3, prior_strength = 1 / 9, N = 30)

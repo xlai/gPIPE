@@ -61,6 +61,17 @@ dose for Cheung MED designs, combination 1 otherwise).}
 \item{delta, within_set}{Riviere's single pick: the interval half-width and
 whether to pick within the final set or among all tried doses. \code{delta} is
 also the half-width of \code{selection = "interval"}.}
+
+\item{startup}{\code{"none"} (default) or \code{"diagonal"}. With \code{"diagonal"} the
+trial begins with a start-up phase (Riviere et al. 2014, Section 2.1.3).
+The first cohort is treated at the start combination. After a cohort with
+no toxicity in the trial so far, the next cohort goes one level higher in
+every drug that is not at its top level. The phase ends for good, and the
+usual rule takes over on all the data so far, as soon as one of these
+holds: (a) a toxicity has been observed; (b) the current combination has
+every drug at its top level; (c) the next combination is not in the grid
+(a subset grid). No random number is drawn for the dose in the phase. It
+needs \code{rule = "cheung"}, \code{outcome = "binary"} and \code{target = "MTD"}.}
 }
 \value{
 A \code{PipeDesign} object.
