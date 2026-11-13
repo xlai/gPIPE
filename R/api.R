@@ -318,7 +318,8 @@ PipeSimulation := new_class(
 #'     `FALSE`).
 #' @return A `PipeSimulation` with `@truth` (the true probability or mean of
 #'   each combination), `@summary` (one row per trial: patients
-#'   enrolled, early stop, single pick), and trials x combinations matrices
+#'   enrolled, `n_startup` = cohorts treated in the start-up phase, early
+#'   stop, single pick), and trials x combinations matrices
 #'   `@n` (patients), `@s1` (events or outcome sums), `@gamma` (final
 #'   estimate) and `@final_set` (membership of the final dose set).
 #' @examples
