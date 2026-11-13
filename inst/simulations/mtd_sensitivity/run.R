@@ -4,7 +4,8 @@
 # Run from this folder. With no ids, every configuration runs. With ids
 # (e.g. Rscript run.R 4 baseline eps_0.5), only those configurations run, and
 # only their rows in results/mtd_sensitivity.csv and
-# results/mtd_sensitivity_runs.csv are replaced.
+# results/mtd_sensitivity_runs.csv are replaced. The rows with startup =
+# "diagonal" also write results/mtd_startup_phase.csv.
 #
 # Seeds: each configuration has its own `seed` in mtd_configs() and runs its
 # 10000 trials in one process with set.seed(seed) (Mersenne-Twister). The
@@ -27,9 +28,10 @@ run_one <- function(id) {
   sim <- simulate(mtd_design(cfg, eps[[id]]), nsim = mtd_nsim, seed = cfg$seed, truth = mtd_truth,
                   keep_trials = TRUE)
   res <- mtd_summarise(id, sim)
+  phase <- if (cfg$startup == "diagonal") mtd_startup_summarise(id, sim)
   secs <- as.numeric(difftime(Sys.time(), t0, units = "secs"))
-  list(res = res, run = data.frame(id = id, nsim = mtd_nsim, seed = cfg$seed, eps = eps[[id]],
-                                   seconds = round(secs)))
+  run <- data.frame(id = id, nsim = mtd_nsim, seed = cfg$seed, eps = eps[[id]], seconds = round(secs))
+  list(res = res, phase = phase, run = run)
 }
 out <- parallel::mclapply(ids, run_one, mc.cores = min(cores, length(ids)), mc.preschedule = FALSE)
 bad <- !vapply(out, is.list, logical(1))
@@ -58,3 +60,21 @@ if (file.exists(f)) {
 run <- run[order(match(run$id, cfgs$id)), ]
 utils::write.csv(run, f, row.names = FALSE)
 print(run, row.names = FALSE)
+
+# Mechanism of the start-up rows (#51): kept apart from the long format so
+# that the other rows and their metrics stay as they were. One row per
+# configuration with startup = "diagonal".
+phase <- do.call(rbind, lapply(out, `[[`, "phase"))
+if (!is.null(phase)) {
+  phase$mean_n_startup <- signif(phase$mean_n_startup, 7)
+  phase$se_n_startup <- signif(phase$se_n_startup, 5)
+  phase$pct_phase_ended_by_toxicity <- signif(phase$pct_phase_ended_by_toxicity, 7)
+  f <- file.path(dir, "mtd_startup_phase.csv")
+  if (file.exists(f)) {
+    old <- utils::read.csv(f)
+    phase <- rbind(old[!old$id %in% phase$id, names(phase)], phase)
+  }
+  phase <- phase[order(match(phase$id, cfgs$id)), ]
+  utils::write.csv(phase, f, row.names = FALSE)
+  print(phase, row.names = FALSE)
+}

@@ -38,3 +38,15 @@
 "shift_0.1_pick_all_fewest",10000,4537,0.03296875,20
 "shift_0.1_pick_all_interval",10000,4538,0.03296875,25
 "shift_0.05_pick_all",10000,4539,0.059765625,23
+"shift_0.1_eps_fixed_pick_all",10000,4540,0.113359375,25
+"baseline_startup",10000,4541,0.113359375,24
+"single_pick_off_startup",10000,4542,0.113359375,23
+"eps_0.3_startup",10000,4543,0.3,23
+"eps_0.4_startup",10000,4544,0.4,32
+"eps_0.3_pick_all_startup",10000,4545,0.3,31
+"eps_0.4_pick_all_startup",10000,4546,0.4,31
+"selection_fewest_startup",10000,4547,0.113359375,33
+"selection_inverse_n_startup",10000,4548,0.113359375,26
+"shift_0.1_pick_all_fewest_startup",10000,4549,0.03296875,25
+"shift_0.1_eps_fixed_startup",10000,4550,0.113359375,25
+"shift_0.1_eps_fixed_pick_all_startup",10000,4551,0.113359375,25
