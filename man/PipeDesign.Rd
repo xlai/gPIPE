@@ -8,7 +8,14 @@
 
 \item{target}{\code{"MTD"} or \code{"MED"}.}
 
-\item{theta}{Target threshold.}
+\item{theta}{Target threshold. This is the clinical target, for example a
+toxicity of 0.3 for MTD.}
+
+\item{shift}{A single number added to \code{theta} to give the decision
+threshold \code{theta + shift} (default 0). A positive value moves the
+threshold up. Only for \code{rule = "cheung"}; \code{rule = "ms"} with a \code{shift}
+other than 0 is an error. For a binary outcome, \code{theta + shift} must lie
+strictly between 0 and 1.}
 
 \item{outcome}{\code{"binary"} (Beta priors \code{prior_a}, \code{prior_b}) or
 \code{"normal"} (pooled-variance t posterior, with \code{sigma0} while there is no
@@ -56,6 +63,17 @@ Sweeting 2015) or \code{\link[=cheung_design]{cheung_design()}} (Cheung et al. 2
 \details{
 Coding: a combination is "above" when its parameter exceeds \code{theta}
 (toxic for \code{target = "MTD"}, effective for \code{target = "MED"}).
+
+Decisions use the threshold \code{theta + shift}. The posterior probability
+behind every decision is p = P(parameter > \code{theta} + \code{shift} | data). With
+\code{shift = 0} this is the usual rule. A positive \code{shift} moves the threshold
+up, so a combination whose parameter is exactly \code{theta} is called "below"
+more often. This matters for epsilon-tapering with \code{eps} < 0.5, where a
+combination at exactly \code{theta} is called "below" in only about a fraction
+\code{eps} of the trials, so for MTD the design tends to aim one dose level too
+low. A \code{shift} above 0 corrects this. A negative \code{shift} moves the
+threshold down. The target stays \code{theta}: Riviere's single pick, \code{summary()}
+and \code{calibrate_eps()} all use \code{theta}.
 }
 \examples{
 g <- DoseGrid(levels = c(A = 3, B = 3))

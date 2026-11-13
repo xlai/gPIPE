@@ -148,3 +148,112 @@ test_that("simulate runs trials and keeps them only when asked", {
   s <- simulate(ch, nsim = 3, seed = 2, truth = list(mean = matrix(1:9 / 9, 3), sd = 0.5))
   expect_equal(s@summary$n_enrolled, rep(12, 3))
 })
+
+# ---- shift (#45) ------------------------------------------------------------
+
+shift_design <- function(shift = 0, target = "MTD", ...) {
+  if (target == "MTD") {
+    cheung_design(g33, theta = 0.3, eps = 0.25, target = "MTD", outcome = "binary",
+                  prior_a = 0.3, prior_b = 0.7, N = 30, cohort = 3, shift = shift, ...)
+  } else {
+    cheung_design(g33, theta = 0.5, eps = 0.1, target = "MED", outcome = "normal", sigma0 = 1,
+                  N = 30, cohort = 3, shift = shift, ...)
+  }
+}
+shift_truth <- list(MTD = c(0.1, 0.2, 0.3, 0.2, 0.3, 0.4, 0.3, 0.4, 0.5),
+                    MED = list(mean = c(0.1, 0.3, 0.5, 0.3, 0.5, 0.7, 0.5, 0.7, 0.9), sd = 1))
+
+test_that("shift = 0 is the default and changes nothing", {
+  for (target in c("MTD", "MED")) {
+    for (sel in c("equal", "prob")) {
+      a <- simulate(shift_design(target = target, selection = sel), nsim = 10, seed = 5,
+                    truth = shift_truth[[target]])
+      b <- simulate(shift_design(0, target, selection = sel), nsim = 10, seed = 5,
+                    truth = shift_truth[[target]])
+      expect_identical(a@summary, b@summary)
+      expect_identical(a@n, b@n)
+      expect_identical(a@final_set, b@final_set)
+    }
+  }
+  expect_equal(shift_design()@shift, 0)
+})
+
+test_that("shift = 0 reproduces results computed on dev before the shift existed", {
+  # Computed on dev (commit 1dc7da0): seed 11, 20 trials, first two trials and first six picks.
+  sim <- simulate(shift_design(), nsim = 20, seed = 11, truth = shift_truth$MTD)
+  expect_identical(sim@n[1:2, ], matrix(c(3, 3, 0, 12, 3, 0, 0, 0, 0, 3, 9, 0, 0, 0, 6, 0, 9, 12), 2))
+  expect_identical(sim@s1[1:2, ], matrix(c(0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 1, 0, 3, 5), 2))
+  expect_identical(sim@summary$pick[1:6], c(8L, 5L, 2L, 3L, 2L, 4L))
+})
+
+test_that("estimate() reports P(pi > theta + shift) and next_dose() uses it", {
+  dat <- data.frame(A = c(1, 1, 1, 2, 2, 3, 3), B = c(1, 1, 1, 2, 2, 3, 3),
+                    y = c(0, 1, 0, 1, 1, 1, 0))
+  des <- shift_design(0.1)
+  est <- estimate(des, dat)
+  n <- c(3, 0, 0, 0, 2, 0, 0, 0, 2)
+  x <- c(1, 0, 0, 0, 2, 0, 0, 0, 1)
+  expect_equal(est@p, stats::pbeta(0.4, 0.3 + x, 0.7 + n - x, lower.tail = FALSE))
+  expect_false(isTRUE(all.equal(est@p, estimate(shift_design(0), dat)@p)))
+  # Cell 1 has 1 event in 3 patients: posterior Beta(1.3, 2.7).
+  expect_equal(est@p[1], stats::pbeta(0.4, 1.3, 2.7, lower.tail = FALSE))
+  # next_dose() runs on the same threshold: its candidates come from the shifted p.
+  set.seed(1)
+  nd <- next_dose(des, dat)
+  expect_equal(sum(nd$candidates$prob), 1)
+  expect_output(print(est), "shift = 0.1")
+  expect_output(print(est), "above theta \\+ shift")
+  expect_no_match(capture.output(print(estimate(shift_design(0), dat))), "shift")
+})
+
+test_that("the single pick is centred on theta, not on theta + shift", {
+  g1 <- DoseGrid(levels = c(A = 3))
+  dat <- data.frame(A = rep(1:3, each = 20),
+                    y = c(rep(1, 5), rep(0, 15), rep(1, 9), rep(0, 11), rep(1, 16), rep(0, 4)))
+  mk <- function(shift) {
+    cheung_design(g1, theta = 0.3, eps = 0.5, target = "MTD", outcome = "binary", prior_a = 1,
+                  prior_b = 1, N = 100, shift = shift, within_set = FALSE)
+  }
+  # Posterior mass in [0.2, 0.4] is largest for dose 1 (5/20); in [0.4, 0.6] for dose 2 (9/20).
+  mass <- function(lo, hi) {
+    stats::pbeta(hi, 1 + c(5, 9), 1 + c(15, 11)) - stats::pbeta(lo, 1 + c(5, 9), 1 + c(15, 11))
+  }
+  expect_equal(which.max(mass(0.2, 0.4)), 1L)
+  expect_equal(which.max(mass(0.4, 0.6)), 2L)
+  expect_equal(estimate(mk(0.1), dat)@pick, 1L)
+  # A target of 0.5 with the same delta picks dose 2, so the pick does follow theta.
+  d2 <- cheung_design(g1, theta = 0.5, eps = 0.5, target = "MTD", outcome = "binary", prior_a = 1,
+                      prior_b = 1, N = 100, within_set = FALSE)
+  expect_equal(estimate(d2, dat)@pick, 2L)
+})
+
+test_that("summary() classifies the truth around theta, not theta + shift", {
+  des <- shift_design(0.1)
+  sim <- simulate(des, nsim = 8, seed = 2, truth = shift_truth$MTD)
+  s <- summary(sim)
+  # Truth exactly 0.3 (cells 3, 5, 7) is the target; theta + shift = 0.4 would pick cells 6 and 8.
+  expect_equal(which(abs(sim@truth - 0.3) < 1e-9), c(3L, 5L, 7L))
+  base <- summary(simulate(shift_design(0), nsim = 8, seed = 2, truth = shift_truth$MTD))
+  expect_equal(as.character(s@by_combo$class), as.character(base@by_combo$class))
+  expect_equal(s@by_combo$class[c(3, 5, 7)], base@by_combo$class[c(3, 5, 7)])
+  expect_equal(as.character(s@by_combo$class)[c(1, 6, 9)], c("below", "above", "above"))
+})
+
+test_that("shift is validated", {
+  expect_error(shift_design(c(0.1, 0.2)), "single finite number")
+  expect_error(shift_design(NA_real_), "single finite number")
+  expect_error(shift_design(Inf), "single finite number")
+  expect_error(shift_design(0.7), "strictly between 0 and 1")
+  expect_error(shift_design(-0.3), "strictly between 0 and 1")
+  expect_equal(shift_design(-0.1)@shift, -0.1)
+  expect_error(ms_design(g33, theta = 0.3, prior_median = 0.3, prior_strength = 1 / 9, N = 30,
+                         shift = 0.1), "M&S rule has no shift")
+  expect_error(PipeDesign(grid = g33, theta = 0.3, N = 20, rule = "ms", eps = 0.5, shift = 0.1),
+               "cheung")
+  expect_s7_class(ms_design(g33, theta = 0.3, prior_median = 0.3, prior_strength = 1 / 9, N = 30),
+                  PipeDesign)
+  # Normal outcomes have no bound on theta + shift.
+  expect_equal(shift_design(2, "MED")@shift, 2)
+  des <- shift_design(0.1)
+  expect_error(des@shift <- 0.9, "strictly between")
+})

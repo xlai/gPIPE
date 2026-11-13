@@ -5,7 +5,9 @@
 # (patients), s1 (sum of outcomes) and s2 (sum of squared outcomes). Each
 # model has
 #   family:          "binary" or "normal";
-#   exceedance(n, s1, s2): p = P(parameter_k > theta | data), per combination;
+#   theta:           the clinical target (read by Riviere's pick);
+#   exceedance(n, s1, s2): p = P(parameter_k > theta + shift | data), per
+#                    combination. The decision threshold is theta + shift;
 #   draw(k, size, truth): `size` outcomes at combination k under `truth`.
 #
 # `truth` is a vector of true probabilities for "binary", and a list with
@@ -13,10 +15,12 @@
 
 # Independent Beta(a, b) priors with binary outcomes (Mander & Sweeting 2015).
 # a and b are per combination (or scalars), e.g. from beta_prior_from_median().
-outcome_beta <- function(theta, a, b) {
+# `shift` moves the decision threshold to theta + shift; theta stays the target.
+outcome_beta <- function(theta, a, b, shift = 0) {
+  threshold <- theta + shift
   list(
-    family = "binary", theta = theta, a = a, b = b,
-    exceedance = function(n, s1, s2) beta_exceedance(theta, a, b, n, s1),
+    family = "binary", theta = theta, shift = shift, a = a, b = b,
+    exceedance = function(n, s1, s2) beta_exceedance(threshold, a, b, n, s1),
     draw = function(k, size, truth) stats::rbinom(size, 1, truth[k])
   )
 }
@@ -27,13 +31,14 @@ outcome_beta <- function(theta, a, b) {
 #   P(mu_k > theta) is the t(df) CDF at (ybar_k - theta) / (s_p / sqrt(n_k)),
 # with df = sum(n_k - 1) over tried doses. While df < 1 (or s_p = 0) the known
 # `sigma0` is used with pnorm. Untried doses get p = 0.5.
-outcome_normal <- function(theta, sigma0) {
+outcome_normal <- function(theta, sigma0, shift = 0) {
+  threshold <- theta + shift
   if (!is.numeric(sigma0) || length(sigma0) != 1L || !(sigma0 > 0)) {
     stop("`sigma0` must be a single positive number.", call. = FALSE)
   }
   list(
-    family = "normal", theta = theta, sigma0 = sigma0,
-    exceedance = function(n, s1, s2) normal_exceedance(theta, sigma0, n, s1, s2),
+    family = "normal", theta = theta, shift = shift, sigma0 = sigma0,
+    exceedance = function(n, s1, s2) normal_exceedance(threshold, sigma0, n, s1, s2),
     draw = function(k, size, truth) stats::rnorm(size, truth$mean[k], truth$sd)
   )
 }
