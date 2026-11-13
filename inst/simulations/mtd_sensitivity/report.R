@@ -1,8 +1,9 @@
 # Print the stored results: one row per configuration with the main metrics,
 # grouped by factor with the baseline repeated at the top of each group, the
 # difference from the baseline in PCS, FDR and TPR (with its SE and z), the
-# selection grid of one configuration, a table of all configurations sorted by
-# PCS, and Riviere's reference line.
+# start-up phase pairs (without and with the phase), the selection grid of one
+# configuration, a table of all configurations sorted by PCS, and Riviere's
+# reference line.
 # Usage: Rscript report.R [id = baseline]
 # Run from this folder.
 library(gPIPE)
@@ -65,9 +66,9 @@ show_groups(tab)
 
 # Difference from the baseline in PCS, FDR and TPR, in percentage points. The
 # runs are independent, so SE = sqrt(se1^2 + se2^2) and z = difference / SE.
-dif <- function(id, metric) {
+dif <- function(id, metric, ref = "baseline") {
   a <- get(id, metric)
-  b <- get("baseline", metric)
+  b <- get(ref, metric)
   d <- 100 * (a$estimate - b$estimate)
   se <- 100 * sqrt(a$mc_se^2 + b$mc_se^2)
   c(d = d, se = se, z = if (se > 0) d / se else NA_real_)
@@ -82,6 +83,41 @@ for (nm in c("PCS", "FDR", "TPR")) {
 }
 cat("\nDifference from the baseline in percentage points, with its SE and z (difference / SE).\n")
 show_groups(dtab)
+
+# Start-up phase (#51): each configuration with startup = "diagonal" next to
+# the same configuration without it (the id without "_startup"). Percent
+# metrics and the difference in PCS are in percent (points). The difference
+# is with minus without; the runs are independent, so SE and z are as above.
+# nStartup: mean number of cohorts in the phase, from mtd_startup_phase.csv.
+with_ids <- ids[cfgs$startup[match(ids, cfgs$id)] == "diagonal"]
+if (length(with_ids)) {
+  phase <- utils::read.csv("results/mtd_startup_phase.csv")
+  pairs <- data.frame(without = sub("_startup$", "", with_ids), with = with_ids, stringsAsFactors = FALSE)
+  stopifnot(all(pairs$without %in% ids))
+  one <- function(id, partner = NULL) {
+    d <- if (is.null(partner)) c(d = NA, se = NA, z = NA) else dif(id, "pcs", partner)
+    ph <- phase$mean_n_startup[phase$id == id]
+    data.frame(pair = pairs$without[pairs$with == id | pairs$without == id][1],
+               startup = if (is.null(partner)) "without" else "with",
+               PCS = cell(id, "pcs", 100), FDR = cell(id, "fdr", 100), TPR = cell(id, "tpr", 100),
+               `%above` = cell(id, "pct_patients_above"), `%band` = cell(id, "pct_patients_in_band"),
+               `%below` = cell(id, "pct_patients_below"), cohToContour = cell(id, "first_contour_cohort"),
+               DLTs = cell(id, "n_dlt"), nStartup = if (length(ph)) sprintf("%.2f", ph) else "-",
+               `dPCS (SE)` = if (is.null(partner)) "-" else sprintf("%+.1f (%.1f)", d[["d"]], d[["se"]]),
+               zPCS = if (is.null(partner)) "-" else sprintf("%+.1f", d[["z"]]),
+               check.names = FALSE, stringsAsFactors = FALSE)
+  }
+  st <- do.call(rbind, lapply(seq_len(nrow(pairs)), function(i) {
+    rbind(one(pairs$without[i]), one(pairs$with[i], pairs$without[i]))
+  }))
+  cat("\n== Start-up phase: without vs with the diagonal start-up phase ==\n")
+  cat("pair: the configuration without the phase. Estimate (Monte Carlo SE). PCS, FDR, TPR in percent.\n")
+  cat("dPCS: with minus without, in percentage points.\n")
+  cat("nStartup: mean cohorts in the phase. The phase has at most 5 cohorts, and ends at the first toxicity.\n")
+  print(st, row.names = FALSE, right = FALSE)
+  cat(sprintf("Trials whose phase ended by a toxicity (percent): %.1f to %.1f.\n",
+              min(phase$pct_phase_ended_by_toxicity), max(phase$pct_phase_ended_by_toxicity)))
+}
 
 # All configurations sorted by PCS, best first.
 pcs_all <- vapply(ids, function(i) get(i, "pcs")$estimate, 0)

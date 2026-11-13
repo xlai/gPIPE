@@ -61,6 +61,16 @@
 #' @param delta,within_set Riviere's single pick: the interval half-width and
 #'   whether to pick within the final set or among all tried doses. `delta` is
 #'   also the half-width of `selection = "interval"`.
+#' @param startup `"none"` (default) or `"diagonal"`. With `"diagonal"` the
+#'   trial begins with a start-up phase (Riviere et al. 2014, Section 2.1.3).
+#'   The first cohort is treated at the start combination. After a cohort with
+#'   no toxicity in the trial so far, the next cohort goes one level higher in
+#'   every drug that is not at its top level. The phase ends for good, and the
+#'   usual rule takes over on all the data so far, as soon as one of these
+#'   holds: (a) a toxicity has been observed; (b) the current combination has
+#'   every drug at its top level; (c) the next combination is not in the grid
+#'   (a subset grid). No random number is drawn for the dose in the phase. It
+#'   needs `rule = "cheung"`, `outcome = "binary"` and `target = "MTD"`.
 #' @return A `PipeDesign` object.
 #' @examples
 #' g <- DoseGrid(levels = c(A = 3, B = 3))
@@ -91,7 +101,8 @@ PipeDesign := new_class(
     cohort = new_property(class_numeric, default = 1),
     start = new_property(NULL | class_numeric, default = NULL),
     delta = new_property(class_double, default = 0.1),
-    within_set = new_property(class_logical, default = TRUE)
+    within_set = new_property(class_logical, default = TRUE),
+    startup = new_property(class_character, default = "none")
   ),
   validator = function(self) {
     tryCatch({
@@ -229,6 +240,16 @@ design_data <- function(design, data) {
 #'   `next_dose()`: a list with `dose` (index, `NA` when the trial stops),
 #'   `label`, `stopped`, and `candidates`, a data frame of the candidate doses
 #'   and their probabilities.
+#'
+#' @details With `startup = "diagonal"` (see [PipeDesign]), `next_dose()`
+#'   returns the next start-up combination with probability 1 while the data
+#'   are consistent with the start-up phase being active: no toxicity so far,
+#'   and the patients, in the order of the rows, are on the start-up path in
+#'   cohorts of size `cohort` (patient `i` at step `ceiling(i / cohort)`). A
+#'   cohort that is not yet full stays at its combination. If a toxicity was
+#'   seen, the data leave the path, or the path is used up, the result is the
+#'   usual one. The cohorts are found from the row order and the design's
+#'   `cohort`, because the data do not record them.
 #' @examples
 #' g <- DoseGrid(levels = c(A = 3, B = 3))
 #' des <- ms_design(g, theta = 0.3, prior_median = 0.3, prior_strength = 1 / 9, N = 30)
@@ -282,6 +303,9 @@ method(next_dose, PipeDesign) <- function(design, data = NULL) {
   prob <- numeric(n_combos(design@grid))
   if (!sum(x$n)) {
     prob[d$start] <- 1
+    stopped <- FALSE
+  } else if (!is.na(nxt <- startup_next(d, x$history, x$s1))) {
+    prob[nxt] <- 1
     stopped <- FALSE
   } else {
     step <- trial_step(d, x$n, x$s1, x$s2, x$history)

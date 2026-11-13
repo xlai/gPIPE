@@ -4,7 +4,8 @@ How much does each component of PIPE with epsilon-tapering matter for
 finding the maximum tolerated dose (MTD) contour with binary toxicity? This
 folder holds the baseline, two reference lines, rows that change one
 factor at a time from the baseline, rows for the selection rules and the
-band shift, and a few exploratory rows that change several things at once.
+band shift, exploratory rows that change several things at once, and rows
+with a start-up phase.
 
 - `common.R`: the scenario, the configuration table `mtd_configs()`, the
   design built from a row, and the summary of one simulation.
@@ -124,6 +125,39 @@ The combination rows are exploratory. Each changes more than one thing from
 the baseline, so a difference cannot be put down to one factor. The
 `shift` column of the configuration table is 0 for every other row.
 
+## Start-up phase rows
+
+`startup = "diagonal"` (issue #51) starts the trial with the diagonal
+escalation phase of Riviere et al. (2014): the first cohort at combination 1,
+then one level up in every drug that is not at its top level after each
+cohort without a toxicity, until the first toxicity (or a top combination).
+After that the usual rule runs on all the data. No random number is drawn in
+the phase. The `startup` column of the configuration table is `"none"` for
+every row except these.
+
+Each `<id>_startup` row is the row `<id>` with `startup = "diagonal"` and its
+own seed (4541 to 4551). Everything else is the same, including epsilon. The
+row without a start-up phase is the comparison row.
+
+| row with start-up | comparison row |
+|---|---|
+| `baseline_startup` | `baseline` |
+| `single_pick_off_startup` | `single_pick_off` |
+| `eps_0.3_startup`, `eps_0.4_startup` | `eps_0.3`, `eps_0.4` |
+| `eps_0.3_pick_all_startup`, `eps_0.4_pick_all_startup` | `eps_0.3_pick_all`, `eps_0.4_pick_all` |
+| `selection_fewest_startup`, `selection_inverse_n_startup` | `selection_fewest`, `selection_inverse_n` |
+| `shift_0.1_pick_all_fewest_startup` | `shift_0.1_pick_all_fewest` (shift 0.1 with its calibrated epsilon 0.033) |
+| `shift_0.1_eps_fixed_startup` | `shift_0.1_eps_fixed` |
+| `shift_0.1_eps_fixed_pick_all_startup` | `shift_0.1_eps_fixed_pick_all` (new, seed 4540: shift 0.1, epsilon 0.113, `within_set = FALSE`) |
+
+The start-up mechanism is in `results/mtd_startup_phase.csv`, one row per
+start-up configuration, so that the stored rows of the other configurations
+and their metrics stay as they were: `mean_n_startup` (cohorts treated in the
+phase) with its Monte Carlo SE `se_n_startup`, and
+`pct_phase_ended_by_toxicity` (percentage of trials whose phase was shorter
+than the diagonal, 5 cohorts, so that a toxicity ended it). `report.R` prints
+a table of each pair, with the difference in PCS, its SE and z.
+
 The two other scenario truths are in `common.R` (`mtd_truth_s2`,
 `mtd_truth_s3`), copied from `riviere2014_scenarios_all14.csv` in the same
 combination order. A Beta prior with median 0.5 and strength 2 is Beta(1,1),
@@ -191,6 +225,8 @@ with `pct_` are percentages. The others are counts.
   `calibration_alpha_0.20.csv`, `calibration_shift_0.1.csv`,
   `calibration_shift_0.075.csv`, `calibration_shift_0.05.csv`,
   `calibration_shift_0.025.csv`, `riviere2014_scenario1_pcs.csv`.
+- `mtd_startup_phase.csv`: the start-up phase of the `*_startup` rows:
+  `id`, `mean_n_startup`, `se_n_startup`, `pct_phase_ended_by_toxicity`.
 
 ## Seeds
 

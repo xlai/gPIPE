@@ -63,6 +63,9 @@ mtd_is_contour <- function(truth = c(mtd_truth), theta = mtd_theta) truth >= the
 #   calibration:  file in results/ that gives epsilon when eps is NA;
 #   shift:        shift of the decision threshold (theta + shift), cheung
 #                 only; 0 is the usual rule;
+#   startup:      "none" (the usual rule from the first cohort) or "diagonal"
+#                 (diagonal start-up phase until the first toxicity), cheung
+#                 only;
 #   N, cohort, start (NA = the default, combination 1), delta, within_set;
 #   admis, constraint, safety: M&S options ("ms" only; safety NA = none);
 #   seed:         seed of this configuration's simulation (unique per row).
@@ -73,13 +76,14 @@ mtd_configs <- function() {
                   prior_method = "exact", prior_form = "flat",
                   calibration = "calibration_baseline.csv", N = 60, cohort = 3, start = NA_real_, delta = 0.1,
                   within_set = TRUE, admis = NA_character_, constraint = NA_character_,
-                  safety = NA_real_, shift = 0, seed) {
+                  safety = NA_real_, shift = 0, startup = "none", seed) {
     data.frame(id = id, factor = factor, rule = rule, eps = eps, taper = taper, weights = weights,
                selection = selection, prior_median = prior_median, prior_strength = prior_strength,
                prior_method = prior_method, prior_form = prior_form,
                calibration = calibration, N = N, cohort = cohort, start = start, delta = delta,
                within_set = within_set, admis = admis, constraint = constraint, safety = safety,
-               shift = shift, seed = seed, stringsAsFactors = FALSE)
+               shift = shift, startup = startup, seed = seed,
+               stringsAsFactors = FALSE)
   }
   rbind(
     row("baseline", "baseline", seed = 4501),
@@ -140,7 +144,28 @@ mtd_configs <- function() {
     row("shift_0.1_pick_all_interval", "combination", shift = 0.1, selection = "interval",
         calibration = "calibration_shift_0.1.csv", within_set = FALSE, seed = 4538),
     row("shift_0.05_pick_all", "combination", shift = 0.05, calibration = "calibration_shift_0.05.csv",
-        within_set = FALSE, seed = 4539)
+        within_set = FALSE, seed = 4539),
+    # Start-up phase (#51). Each "_startup" row is the row of the same name
+    # without its suffix, with startup = "diagonal" and its own seed. The
+    # one row below has no start-up phase: it is the partner of
+    # shift_0.1_eps_fixed_pick_all_startup.
+    row("shift_0.1_eps_fixed_pick_all", "startup", shift = 0.1, within_set = FALSE, seed = 4540),
+    row("baseline_startup", "startup", startup = "diagonal", seed = 4541),
+    row("single_pick_off_startup", "startup", startup = "diagonal", within_set = FALSE, seed = 4542),
+    row("eps_0.3_startup", "startup", eps = 0.3, startup = "diagonal", seed = 4543),
+    row("eps_0.4_startup", "startup", eps = 0.4, startup = "diagonal", seed = 4544),
+    row("eps_0.3_pick_all_startup", "startup", eps = 0.3, startup = "diagonal", within_set = FALSE,
+        seed = 4545),
+    row("eps_0.4_pick_all_startup", "startup", eps = 0.4, startup = "diagonal", within_set = FALSE,
+        seed = 4546),
+    row("selection_fewest_startup", "startup", selection = "fewest", startup = "diagonal", seed = 4547),
+    row("selection_inverse_n_startup", "startup", selection = "inverse_n", startup = "diagonal",
+        seed = 4548),
+    row("shift_0.1_pick_all_fewest_startup", "startup", shift = 0.1, selection = "fewest",
+        calibration = "calibration_shift_0.1.csv", startup = "diagonal", within_set = FALSE, seed = 4549),
+    row("shift_0.1_eps_fixed_startup", "startup", shift = 0.1, startup = "diagonal", seed = 4550),
+    row("shift_0.1_eps_fixed_pick_all_startup", "startup", shift = 0.1, startup = "diagonal",
+        within_set = FALSE, seed = 4551)
   )
 }
 
@@ -177,7 +202,8 @@ mtd_design <- function(cfg, eps = mtd_eps(cfg)) {
   pr <- gPIPE:::beta_prior_from_median(med, cfg$prior_strength, method = cfg$prior_method)
   cheung_design(grid, theta = mtd_theta, eps = eps, target = "MTD", outcome = "binary",
                 taper = cfg$taper, weights = cfg$weights, selection = cfg$selection,
-                shift = cfg$shift, prior_a = pr$a, prior_b = pr$b, N = cfg$N, cohort = cfg$cohort, start = start,
+                shift = cfg$shift, startup = cfg$startup, prior_a = pr$a, prior_b = pr$b, N = cfg$N,
+                cohort = cfg$cohort, start = start,
                 delta = cfg$delta, within_set = cfg$within_set)
 }
 
@@ -233,6 +259,24 @@ mtd_trial_metrics <- function(sim, truth = sim@truth, theta = mtd_theta, two_sid
     set_has_mtd = as.numeric(rowSums(sim@final_set[, mtd, drop = FALSE]) > 0),
     n_mtd_tried = rowSums(sim@n[, mtd, drop = FALSE] > 0)
   )
+}
+
+# Start-up phase (#51), one value per trial from a run with startup =
+# "diagonal". The phase follows the diagonal from combination 1 until every
+# drug is at its top level, so on a full grid it has at most max(levels)
+# cohorts (5 here). `n_startup` is the number of cohorts treated in it. A
+# trial whose phase is shorter than that was ended by a toxicity.
+mtd_startup_length <- function(grid = mtd_grid()) max(grid@levels)
+
+# Summary of the start-up phase of one simulation, one row: mean number of
+# cohorts in the phase (with its Monte Carlo SE) and the percentage of trials
+# whose phase ended by a toxicity before the end of the diagonal.
+mtd_startup_summarise <- function(id, sim) {
+  n_startup <- sim@summary$n_startup
+  ended <- 100 * mean(n_startup < mtd_startup_length(sim@design@grid))
+  data.frame(id = id, mean_n_startup = mean(n_startup),
+             se_n_startup = stats::sd(n_startup) / sqrt(length(n_startup)),
+             pct_phase_ended_by_toxicity = ended, stringsAsFactors = FALSE)
 }
 
 # Units: fdr, tpr, pcs, p_set_false are proportions (0 to 1); names starting

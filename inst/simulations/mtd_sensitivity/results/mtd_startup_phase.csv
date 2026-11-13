@@ -1,0 +1,12 @@
+"id","mean_n_startup","se_n_startup","pct_phase_ended_by_toxicity"
+"baseline_startup",2.4876,0.0086967,98.87
+"single_pick_off_startup",2.4968,0.008634,99.01
+"eps_0.3_startup",2.4903,0.0087566,98.75
+"eps_0.4_startup",2.4659,0.0086863,98.94
+"eps_0.3_pick_all_startup",2.5,0.0087286,98.88
+"eps_0.4_pick_all_startup",2.4641,0.0086498,99.08
+"selection_fewest_startup",2.4782,0.0086197,98.97
+"selection_inverse_n_startup",2.4699,0.0087107,98.91
+"shift_0.1_pick_all_fewest_startup",2.4773,0.0086842,98.98
+"shift_0.1_eps_fixed_startup",2.4816,0.0086864,99
+"shift_0.1_eps_fixed_pick_all_startup",2.485,0.0087364,98.86

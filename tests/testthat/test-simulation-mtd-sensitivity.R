@@ -3,8 +3,8 @@
 # The results are stored in inst/simulations/mtd_sensitivity/results: the
 # calibrations of epsilon (three values of alpha, four band shifts), and
 # 10000 trials of each configuration (the baseline, the one-factor-at-a-time
-# rows, the selection, band shift and exploratory combination rows, and the
-# Mander & Sweeting design) on Riviere et al.'s scenario 1. The scripts
+# rows, the selection, band shift and exploratory combination rows, the rows with
+# a start-up phase, and the Mander & Sweeting design) on Riviere et al.'s scenario 1. The scripts
 # beside them make the runs again. This checks the stored files only, so it does not change when the
 # package code changes.
 
@@ -26,6 +26,12 @@ test_that("the stored MTD sensitivity results are complete and consistent", {
   cal <- read("calibration_baseline.csv")
   ref <- read("riviere2014_scenario1_pcs.csv")
 
+  # The start-up rows (#51): each is the row of the same name without the suffix.
+  with_startup <- c("baseline_startup", "single_pick_off_startup", "eps_0.3_startup",
+                    "eps_0.4_startup", "eps_0.3_pick_all_startup", "eps_0.4_pick_all_startup",
+                    "selection_fewest_startup", "selection_inverse_n_startup",
+                    "shift_0.1_pick_all_fewest_startup", "shift_0.1_eps_fixed_startup",
+                    "shift_0.1_eps_fixed_pick_all_startup")
   ids <- c("baseline", "eps_0.5", "ref_ms",
            "eps_0.4", "eps_0.3", "eps_0.15", "eps_0.05", "alpha_0.10", "alpha_0.20",
            "taper_off", "weights_1", "prior_strength_1", "prior_strength_4",
@@ -35,11 +41,13 @@ test_that("the stored MTD sensitivity results are complete and consistent", {
            "selection_fewest", "selection_inverse_n", "selection_interval",
            "shift_0.1", "shift_0.075", "shift_0.05", "shift_0.025", "shift_0.1_eps_fixed",
            "eps_0.4_pick_all", "eps_0.3_pick_all", "shift_0.1_pick_all",
-           "shift_0.1_pick_all_fewest", "shift_0.1_pick_all_interval", "shift_0.05_pick_all")
+           "shift_0.1_pick_all_fewest", "shift_0.1_pick_all_interval", "shift_0.05_pick_all",
+           "shift_0.1_eps_fixed_pick_all", with_startup)
   expect_setequal(res$id, ids)
   expect_setequal(runs$id, ids)
   expect_equal(runs$nsim, rep(10000, length(ids)))
   expect_false(anyDuplicated(runs$seed) > 0)
+  expect_equal(runs$seed[match(c("shift_0.1_eps_fixed_pick_all", with_startup), runs$id)], 4540:4551)
 
   # Every metric is there, for every configuration, and the combinations are
   # the 15 of the 5 x 3 grid.
@@ -140,14 +148,16 @@ test_that("the stored MTD sensitivity results are complete and consistent", {
   # baseline epsilon.
   eps_of <- function(id) runs$eps[runs$id == id]
   fixed <- c(eps_0.5 = 0.5, eps_0.4 = 0.4, eps_0.3 = 0.3, eps_0.15 = 0.15, eps_0.05 = 0.05,
-             eps_0.4_pick_all = 0.4, eps_0.3_pick_all = 0.3)
+             eps_0.4_pick_all = 0.4, eps_0.3_pick_all = 0.3, eps_0.3_startup = 0.3,
+             eps_0.4_startup = 0.4, eps_0.3_pick_all_startup = 0.3, eps_0.4_pick_all_startup = 0.4)
   for (id in names(fixed)) expect_equal(eps_of(id), fixed[[id]], info = id)
   expect_true(is.na(eps_of("ref_ms")))
   expect_equal(eps_of("alpha_0.10"), sel[2])
   expect_equal(eps_of("alpha_0.20"), sel[3])
   shift_of <- c(shift_0.1 = "0.1", shift_0.075 = "0.075", shift_0.05 = "0.05", shift_0.025 = "0.025",
                 shift_0.1_pick_all = "0.1", shift_0.1_pick_all_fewest = "0.1",
-                shift_0.1_pick_all_interval = "0.1", shift_0.05_pick_all = "0.05")
+                shift_0.1_pick_all_interval = "0.1", shift_0.05_pick_all = "0.05",
+                shift_0.1_pick_all_fewest_startup = "0.1")
   for (id in names(shift_of)) expect_equal(eps_of(id), sel_shift[[shift_of[[id]]]], info = id)
   own <- c(names(fixed), "ref_ms", "alpha_0.10", "alpha_0.20", names(shift_of))
   for (id in setdiff(ids, own)) expect_equal(eps_of(id), sel[1], info = id)
@@ -161,6 +171,26 @@ test_that("the stored MTD sensitivity results are complete and consistent", {
     sum(r$estimate)
   }
   expect_gt(p_sel("shift_0.1_eps_fixed"), p_sel("baseline"))
+
+  # Start-up phase (#51): the mechanism file has one row for each start-up
+  # configuration. The phase has 1 to 5 cohorts (the diagonal of the 5 x 3
+  # grid), and nearly every trial's phase ends by a toxicity. The partner of
+  # each start-up row has the same epsilon and exists in the results.
+  ph <- read("mtd_startup_phase.csv")
+  expect_setequal(ph$id, with_startup)
+  expect_false(anyNA(ph))
+  expect_true(all(ph$mean_n_startup >= 1 & ph$mean_n_startup <= 5))
+  expect_true(all(ph$pct_phase_ended_by_toxicity > 90 & ph$pct_phase_ended_by_toxicity <= 100))
+  expect_true(all(ph$se_n_startup > 0))
+  partner <- sub("_startup$", "", with_startup)
+  expect_true(all(partner %in% ids))
+  expect_equal(runs$eps[match(with_startup, runs$id)], runs$eps[match(partner, runs$id)])
+  # The phase moves patients up the diagonal early: the first cohort on the
+  # contour comes sooner than in the partner row.
+  fcc <- function(id) {
+    vapply(id, function(i) res$estimate[res$id == i & res$metric == "first_contour_cohort"], 0)
+  }
+  expect_true(all(fcc(with_startup) < fcc(partner)))
 
   # Riviere's published PCS for scenario 1 (percent): seven designs.
   expect_equal(nrow(ref), 7)
