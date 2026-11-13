@@ -40,8 +40,16 @@ for no safety rule.}
 \item{start}{Index of the first combination; \code{NULL} for the default (top
 dose for Cheung MED designs, combination 1 otherwise).}
 
-\item{delta, within_set}{Riviere's single pick: the interval half-width and
-whether to pick within the final set or among all tried doses.}
+\item{delta, within_set}{The single pick: the interval half-width of
+Riviere's rule (not used when \code{pick = "isotonic"}) and whether to pick
+within the final set or among all tried doses.}
+
+\item{pick}{How the single dose is chosen: \code{"interval"} (Riviere's
+interval rule, the default) or \code{"isotonic"} (the tried dose whose
+weighted isotonic estimate of the toxicity rate, under the dose order of
+the grid, is closest to \code{theta}; ties go to the dose with more patients,
+then to the lower index). \code{"isotonic"} is for binary outcomes and
+\code{target = "MTD"} only.}
 }
 \value{
 A \code{PipeDesign} object.
