@@ -21,8 +21,8 @@ the outcome. \code{NULL} before any patient.}
 \code{estimate()}: a \code{PipeEstimate} with properties \code{p} (posterior
 probability of exceeding the decision threshold, P(parameter > \code{theta} +
 \code{shift} | data)), \code{gamma} (0/1
-estimate), \code{q} (M&S safety probabilities, or \code{NULL}), \code{set} and \code{pick} (Riviere's single dose,
-binary MTD designs only), indices into the grid's combinations.
+estimate), \code{q} (M&S safety probabilities, or \code{NULL}), \code{set} and \code{pick} (the single
+recommended dose, by the design's \code{pick} rule; binary MTD designs only), indices into the grid's combinations.
 \code{next_dose()}: a list with \code{dose} (index, \code{NA} when the trial stops),
 \code{label}, \code{stopped}, and \code{candidates}, a data frame of the candidate doses
 and their probabilities.

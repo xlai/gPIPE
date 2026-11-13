@@ -41,7 +41,9 @@
 #                  step 0; the maximal combination with the largest index on
 #                  a subset grid), and to combination 1 otherwise;
 #   rule:          "cheung" or "ms";
-#   eps, taper, weights, selection: as described above; "ms" always uses
+#   eps, taper, weights, selection: as described above; selection = "closest"
+#     (cheung, binary MTD only) gives the candidates whose isotonic estimate is
+#     closest to theta (untried: theta) equal weight and the rest 0; "ms" always uses
 #     eps = 0.5 and w = 1 (other values are an error), and selection is one of
 #     ms_selection_weights()'s ("min_S" by default);
 #   admis, constraint, safety: M&S options, see ms_decide();
@@ -90,6 +92,9 @@ pipe_trial_design <- function(grid, model, target = c("MTD", "MED"), N, cohort =
   if (!(N >= 1 && cohort >= 1)) {
     stop("`N` and `cohort` must be at least 1.", call. = FALSE)
   }
+  if (length(delta) != 1L || !is.finite(delta) || delta < 0) {
+    stop("`delta` must be a single number, 0 or more.", call. = FALSE)
+  }
   check_eps(eps)
   if (!is.character(startup) || length(startup) != 1L || !startup %in% c("none", "diagonal")) {
     stop("`startup` must be \"none\" or \"diagonal\".", call. = FALSE)
@@ -103,9 +108,12 @@ pipe_trial_design <- function(grid, model, target = c("MTD", "MED"), N, cohort =
   weights <- weights %||% if (rule == "cheung") "n+1" else "1"
   selection <- selection %||% if (rule == "cheung") "equal" else "min_S"
   if (rule == "cheung") {
-    selection <- match.arg(selection, c("equal", "prob", "fewest", "inverse_n", "interval"))
+    selection <- match.arg(selection, c("equal", "prob", "fewest", "inverse_n", "interval", "closest"))
     if (selection == "interval" && model$family != "binary") {
       stop("`selection = \"interval\"` needs a binary outcome model.", call. = FALSE)
+    }
+    if (selection == "closest" && (model$family != "binary" || target != "MTD")) {
+      stop("`selection = \"closest\"` is for a binary outcome and MTD only.", call. = FALSE)
     }
   } else {
     selection <- match.arg(selection, c("min_S", "inverse_S", "equal", "inverse_sqrt_S"))
@@ -226,6 +234,11 @@ trial_step <- function(design, n, s1, s2, history) {
         beta_interval_prob(model$theta, design$delta,
                            rep_len(model$a, K)[cand] + s1[cand],
                            rep_len(model$b, K)[cand] + n[cand] - s1[cand])
+      },
+      closest = {
+        theta <- design$model$theta
+        est <- replace(isotonic_fit(design$g, n, s1)[cand], n[cand] == 0, theta)
+        as.numeric(cand %in% closest_to(abs(est - theta), cand))
       }
     )
     prob[cand] <- if (any(w > 0)) w else 1

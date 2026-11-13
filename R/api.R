@@ -47,7 +47,10 @@
 #'   * `"fewest"`: the same for the doses with the fewest patients so far;
 #'   * `"inverse_n"`: proportional to 1 / (n + 1), with n the patients so far;
 #'   * `"interval"`: proportional to the posterior probability that the
-#'     parameter is within `delta` of `theta` (binary outcome only).
+#'     parameter is within `delta` of `theta` (binary outcome only);
+#'   * `"closest"`: the same for the doses whose isotonic estimate of the
+#'     toxicity rate is closest to `theta` (an untried dose counts as `theta`),
+#'     0 for the others (binary outcome and `target = "MTD"` only).
 #'
 #'   If all weights are 0, the doses get equal probability. For `"ms"`:
 #'   `"min_S"`, `"inverse_S"`, `"equal"` or `"inverse_sqrt_S"`. `NULL` for the
@@ -58,9 +61,10 @@
 #' @param N,cohort Maximum number of patients and cohort size.
 #' @param start Index of the first combination; `NULL` for the default (top
 #'   dose for Cheung MED designs, combination 1 otherwise).
-#' @param delta,within_set Riviere's single pick: the interval half-width and
-#'   whether to pick within the final set or among all tried doses. `delta` is
-#'   also the half-width of `selection = "interval"`.
+#' @param delta,within_set The single pick: the interval half-width of
+#'   Riviere's rule (not used when `pick = "isotonic"`) and whether to pick
+#'   within the final set or among all tried doses. `delta` is also the
+#'   half-width of `selection = "interval"`.
 #' @param startup `"none"` (default) or `"diagonal"`. With `"diagonal"` the
 #'   trial begins with a start-up phase (Riviere et al. 2014, Section 2.1.3).
 #'   The first cohort is treated at the start combination. After a cohort with
@@ -242,8 +246,8 @@ design_data <- function(design, data) {
 #' @return `estimate()`: a `PipeEstimate` with properties `p` (posterior
 #'   probability of exceeding the decision threshold, P(parameter > `theta` +
 #'   `shift` | data)), `gamma` (0/1
-#'   estimate), `q` (M&S safety probabilities, or `NULL`), `set` and `pick` (Riviere's single dose,
-#'   binary MTD designs only), indices into the grid's combinations.
+#'   estimate), `q` (M&S safety probabilities, or `NULL`), `set` and `pick` (the single
+#'   recommended dose, by the design's `pick` rule; binary MTD designs only), indices into the grid's combinations.
 #'   `next_dose()`: a list with `dose` (index, `NA` when the trial stops),
 #'   `label`, `stopped`, and `candidates`, a data frame of the candidate doses
 #'   and their probabilities.

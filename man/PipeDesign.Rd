@@ -42,7 +42,10 @@ sampling set S1 u S0, with probability
 \item \code{"fewest"}: the same for the doses with the fewest patients so far;
 \item \code{"inverse_n"}: proportional to 1 / (n + 1), with n the patients so far;
 \item \code{"interval"}: proportional to the posterior probability that the
-parameter is within \code{delta} of \code{theta} (binary outcome only).
+parameter is within \code{delta} of \code{theta} (binary outcome only);
+\item \code{"closest"}: the same for the doses whose isotonic estimate of the
+toxicity rate is closest to \code{theta} (an untried dose counts as \code{theta}),
+0 for the others (binary outcome and \code{target = "MTD"} only).
 }
 
 If all weights are 0, the doses get equal probability. For \code{"ms"}:
@@ -58,9 +61,10 @@ for no safety rule.}
 \item{start}{Index of the first combination; \code{NULL} for the default (top
 dose for Cheung MED designs, combination 1 otherwise).}
 
-\item{delta, within_set}{Riviere's single pick: the interval half-width and
-whether to pick within the final set or among all tried doses. \code{delta} is
-also the half-width of \code{selection = "interval"}.}
+\item{delta, within_set}{The single pick: the interval half-width of
+Riviere's rule (not used when \code{pick = "isotonic"}) and whether to pick
+within the final set or among all tried doses. \code{delta} is also the
+half-width of \code{selection = "interval"}.}
 
 \item{startup}{\code{"none"} (default) or \code{"diagonal"}. With \code{"diagonal"} the
 trial begins with a start-up phase (Riviere et al. 2014, Section 2.1.3).
