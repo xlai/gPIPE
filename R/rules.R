@@ -50,9 +50,18 @@ riviere_pick <- function(set, theta, a, b, n, x, delta = 0.1, within_set = TRUE)
   }
   a <- rep_len(a, length(n))[pool] + x[pool]
   b <- rep_len(b, length(n))[pool] + n[pool] - x[pool]
-  prob <- stats::pbeta(theta + delta, a, b) - stats::pbeta(theta - delta, a, b)
-  pool[which.max(prob)]
+  pool[which.max(beta_interval_prob(theta, delta, a, b))]
 }
+
+# Probability that a Beta(a, b) parameter lies in [theta - delta, theta +
+# delta]. `a` and `b` are the posterior parameters.
+beta_interval_prob <- function(theta, delta, a, b) {
+  stats::pbeta(theta + delta, a, b) - stats::pbeta(theta - delta, a, b)
+}
+
+# The elements of `pool` whose distance `dist` to the target is smallest (up to
+# a tolerance).
+closest_to <- function(dist, pool) pool[dist <= min(dist) + 1e-9]
 
 # Single dose by the isotonic rule (#54): among the candidates (tried doses,
 # and within `set` when `within_set`), the one whose isotonic estimate of the
@@ -65,8 +74,7 @@ isotonic_pick <- function(grid, set, theta, n, x, within_set = TRUE) {
   if (!length(pool)) {
     return(NA_integer_)
   }
-  dist <- abs(isotonic_fit(grid, n, x)[pool] - theta)
-  pool <- pool[dist <= min(dist) + 1e-9]
+  pool <- closest_to(abs(isotonic_fit(grid, n, x)[pool] - theta), pool)
   pool <- pool[n[pool] == max(n[pool])]
   pool[1L]
 }
