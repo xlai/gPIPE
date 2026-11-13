@@ -4,7 +4,8 @@
 # calibrations of epsilon (three values of alpha, four band shifts), and
 # 10000 trials of each configuration (the baseline, the one-factor-at-a-time
 # rows, the selection, band shift and exploratory combination rows, the rows with
-# a start-up phase, and the Mander & Sweeting design) on Riviere et al.'s scenario 1. The scripts
+# a start-up phase, the isotonic-pick rows, and the Mander & Sweeting design) on
+# Riviere et al.'s scenario 1. The scripts
 # beside them make the runs again. This checks the stored files only, so it does not change when the
 # package code changes.
 
@@ -32,6 +33,14 @@ test_that("the stored MTD sensitivity results are complete and consistent", {
                     "selection_fewest_startup", "selection_inverse_n_startup",
                     "shift_0.1_pick_all_fewest_startup", "shift_0.1_eps_fixed_startup",
                     "shift_0.1_eps_fixed_pick_all_startup")
+  # The isotonic-pick rows (#54, step 2): the id of the interval-pick partner
+  # plus "_iso", seeds 4552 to 4569.
+  with_iso <- c("single_pick_off_iso", "baseline_iso", "single_pick_off_startup_iso",
+                "eps_0.3_pick_all_iso", "eps_0.4_pick_all_iso", "eps_0.5_iso",
+                "eps_0.4_pick_all_startup_iso", "shift_0.1_eps_fixed_pick_all_iso",
+                "shift_0.1_eps_fixed_pick_all_startup_iso", "selection_fewest_iso",
+                "selection_inverse_n_iso", "taper_off_iso", "weights_1_iso",
+                "prior_strength_1_iso", "cohort_1_iso", "N_120_iso", "N_30_iso", "ref_ms_iso")
   ids <- c("baseline", "eps_0.5", "ref_ms",
            "eps_0.4", "eps_0.3", "eps_0.15", "eps_0.05", "alpha_0.10", "alpha_0.20",
            "taper_off", "weights_1", "prior_strength_1", "prior_strength_4",
@@ -42,12 +51,13 @@ test_that("the stored MTD sensitivity results are complete and consistent", {
            "shift_0.1", "shift_0.075", "shift_0.05", "shift_0.025", "shift_0.1_eps_fixed",
            "eps_0.4_pick_all", "eps_0.3_pick_all", "shift_0.1_pick_all",
            "shift_0.1_pick_all_fewest", "shift_0.1_pick_all_interval", "shift_0.05_pick_all",
-           "shift_0.1_eps_fixed_pick_all", with_startup)
+           "shift_0.1_eps_fixed_pick_all", with_startup, with_iso)
   expect_setequal(res$id, ids)
   expect_setequal(runs$id, ids)
   expect_equal(runs$nsim, rep(10000, length(ids)))
   expect_false(anyDuplicated(runs$seed) > 0)
   expect_equal(runs$seed[match(c("shift_0.1_eps_fixed_pick_all", with_startup), runs$id)], 4540:4551)
+  expect_equal(runs$seed[match(with_iso, runs$id)], 4552:4569)
 
   # Every metric is there, for every configuration, and the combinations are
   # the 15 of the 5 x 3 grid.
@@ -74,16 +84,16 @@ test_that("the stored MTD sensitivity results are complete and consistent", {
   expect_true(all(res$estimate[is_prop] >= 0 & res$estimate[is_prop] <= 1))
   expect_true(all(res$estimate[is_pct] >= 0 & res$estimate[is_pct] <= 100))
   # N is 30, 60 or 120 patients, in cohorts of 3 (cohort_1: of 1).
-  n_max <- c(N_30 = 30, N_120 = 120)
+  n_max <- c(N_30 = 30, N_120 = 120, N_30_iso = 30, N_120_iso = 120)
   n_cap <- ifelse(res$id %in% names(n_max), n_max[res$id], 60)
   is_n <- res$metric %in% c("mean_patients", "mean_n")
   expect_true(all(res$estimate[is_n] <= n_cap[is_n]))
   # The first cohort on the contour is 1 to the number of cohorts: 10, 20,
   # 40 or, with cohorts of 1, 60.
   max_cohorts <- rep(20, nrow(res))
-  max_cohorts[res$id == "N_30"] <- 10
-  max_cohorts[res$id == "N_120"] <- 40
-  max_cohorts[res$id == "cohort_1"] <- 60
+  max_cohorts[res$id %in% c("N_30", "N_30_iso")] <- 10
+  max_cohorts[res$id %in% c("N_120", "N_120_iso")] <- 40
+  max_cohorts[res$id %in% c("cohort_1", "cohort_1_iso")] <- 60
   fc <- res$metric == "first_contour_cohort"
   expect_true(all(res$estimate[fc] >= 1 & res$estimate[fc] <= max_cohorts[fc]))
   expect_true(all(res$estimate[res$metric == "n_mtd_tried"] <= 3))
@@ -149,9 +159,12 @@ test_that("the stored MTD sensitivity results are complete and consistent", {
   eps_of <- function(id) runs$eps[runs$id == id]
   fixed <- c(eps_0.5 = 0.5, eps_0.4 = 0.4, eps_0.3 = 0.3, eps_0.15 = 0.15, eps_0.05 = 0.05,
              eps_0.4_pick_all = 0.4, eps_0.3_pick_all = 0.3, eps_0.3_startup = 0.3,
-             eps_0.4_startup = 0.4, eps_0.3_pick_all_startup = 0.3, eps_0.4_pick_all_startup = 0.4)
+             eps_0.4_startup = 0.4, eps_0.3_pick_all_startup = 0.3, eps_0.4_pick_all_startup = 0.4,
+             eps_0.3_pick_all_iso = 0.3, eps_0.4_pick_all_iso = 0.4, eps_0.5_iso = 0.5,
+             eps_0.4_pick_all_startup_iso = 0.4)
   for (id in names(fixed)) expect_equal(eps_of(id), fixed[[id]], info = id)
   expect_true(is.na(eps_of("ref_ms")))
+  expect_true(is.na(eps_of("ref_ms_iso")))
   expect_equal(eps_of("alpha_0.10"), sel[2])
   expect_equal(eps_of("alpha_0.20"), sel[3])
   shift_of <- c(shift_0.1 = "0.1", shift_0.075 = "0.075", shift_0.05 = "0.05", shift_0.025 = "0.025",
@@ -159,7 +172,7 @@ test_that("the stored MTD sensitivity results are complete and consistent", {
                 shift_0.1_pick_all_interval = "0.1", shift_0.05_pick_all = "0.05",
                 shift_0.1_pick_all_fewest_startup = "0.1")
   for (id in names(shift_of)) expect_equal(eps_of(id), sel_shift[[shift_of[[id]]]], info = id)
-  own <- c(names(fixed), "ref_ms", "alpha_0.10", "alpha_0.20", names(shift_of))
+  own <- c(names(fixed), "ref_ms", "ref_ms_iso", "alpha_0.10", "alpha_0.20", names(shift_of))
   for (id in setdiff(ids, own)) expect_equal(eps_of(id), sel[1], info = id)
 
   # Mechanism of the shift: with a shift of 0.1 and the same epsilon, a dose
@@ -177,7 +190,7 @@ test_that("the stored MTD sensitivity results are complete and consistent", {
   # grid), and nearly every trial's phase ends by a toxicity. The partner of
   # each start-up row has the same epsilon and exists in the results.
   ph <- read("mtd_startup_phase.csv")
-  expect_setequal(ph$id, with_startup)
+  expect_setequal(ph$id, c(with_startup, grep("startup_iso$", with_iso, value = TRUE)))
   expect_false(anyNA(ph))
   expect_true(all(ph$mean_n_startup >= 1 & ph$mean_n_startup <= 5))
   expect_true(all(ph$pct_phase_ended_by_toxicity > 90 & ph$pct_phase_ended_by_toxicity <= 100))
@@ -191,6 +204,44 @@ test_that("the stored MTD sensitivity results are complete and consistent", {
     vapply(id, function(i) res$estimate[res$id == i & res$metric == "first_contour_cohort"], 0)
   }
   expect_true(all(fcc(with_startup) < fcc(partner)))
+
+  # Isotonic pick (#54): the pick classes are stored for the isotonic rows
+  # only. They agree with the stored pct_pick of the row (PCS, over, under),
+  # the classes cannot add up to more than 100, and the 15 combinations add up
+  # to 100 minus the share without a pick. The partner of each row is the id
+  # without "_iso" and has the same epsilon.
+  pc <- read("mtd_pick_classes.csv")
+  expect_setequal(pc$id, with_iso)
+  expect_false(anyNA(pc))
+  combo_cols <- paste0("pct_pick_", labels)
+  expect_true(all(combo_cols %in% names(pc)))
+  expect_equal(ncol(pc), 1 + 4 + 15)
+  truth <- c(0.05, 0.10, 0.15, 0.30, 0.45, 0.10, 0.15, 0.30, 0.45, 0.55,
+             0.15, 0.30, 0.45, 0.50, 0.60)
+  for (id in with_iso) {
+    p <- pc[pc$id == id, ]
+    pick <- res[res$id == id & res$metric == "pct_pick", ]
+    expect_equal(unlist(p[combo_cols]), setNames(pick$estimate, combo_cols), tolerance = 1e-5, info = id)
+    expect_equal(p$pct_pick_mtd, 100 * res$estimate[res$id == id & res$metric == "pcs"], tolerance = 1e-5,
+                 info = id)
+    expect_equal(p$pct_pick_over, sum(pick$estimate[truth >= 0.45 - 1e-8]), tolerance = 1e-5, info = id)
+    expect_equal(p$pct_pick_under, sum(pick$estimate[truth <= 0.15 + 1e-8]), tolerance = 1e-5, info = id)
+    expect_equal(sum(unlist(p[combo_cols])) + p$pct_no_pick, 100, tolerance = 1e-4, info = id)
+    expect_lte(p$pct_pick_mtd + p$pct_pick_over + p$pct_pick_under, 100 + 1e-6)
+  }
+  iso_partner <- sub("_iso$", "", with_iso)
+  expect_true(all(iso_partner %in% ids))
+  expect_equal(runs$eps[match(with_iso, runs$id)], runs$eps[match(iso_partner, runs$id)])
+  # The pick changes the single dose only: the trial conduct and the final set
+  # are the partner's, so FDR and TPR agree with the partner's within Monte
+  # Carlo error (differences below 1.5 points here).
+  for (m in c("fdr", "tpr")) {
+    gap <- vapply(seq_along(with_iso), function(i) {
+      est <- function(id) res$estimate[res$id == id & res$metric == m]
+      abs(est(with_iso[i]) - est(iso_partner[i]))
+    }, 0)
+    expect_true(all(gap < 0.015), info = m)
+  }
 
   # Riviere's published PCS for scenario 1 (percent): seven designs.
   expect_equal(nrow(ref), 7)

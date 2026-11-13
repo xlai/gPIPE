@@ -66,6 +66,9 @@ mtd_is_contour <- function(truth = c(mtd_truth), theta = mtd_theta) truth >= the
 #   startup:      "none" (the usual rule from the first cohort) or "diagonal"
 #                 (diagonal start-up phase until the first toxicity), cheung
 #                 only;
+#   pick:         "interval" (Riviere's interval rule for the single pick) or
+#                 "isotonic" (the tried dose whose isotonic toxicity estimate
+#                 is closest to theta, #54), cheung and ms rows;
 #   N, cohort, start (NA = the default, combination 1), delta, within_set;
 #   admis, constraint, safety: M&S options ("ms" only; safety NA = none);
 #   seed:         seed of this configuration's simulation (unique per row).
@@ -76,13 +79,13 @@ mtd_configs <- function() {
                   prior_method = "exact", prior_form = "flat",
                   calibration = "calibration_baseline.csv", N = 60, cohort = 3, start = NA_real_, delta = 0.1,
                   within_set = TRUE, admis = NA_character_, constraint = NA_character_,
-                  safety = NA_real_, shift = 0, startup = "none", seed) {
+                  safety = NA_real_, shift = 0, startup = "none", pick = "interval", seed) {
     data.frame(id = id, factor = factor, rule = rule, eps = eps, taper = taper, weights = weights,
                selection = selection, prior_median = prior_median, prior_strength = prior_strength,
                prior_method = prior_method, prior_form = prior_form,
                calibration = calibration, N = N, cohort = cohort, start = start, delta = delta,
                within_set = within_set, admis = admis, constraint = constraint, safety = safety,
-               shift = shift, startup = startup, seed = seed,
+               shift = shift, startup = startup, pick = pick, seed = seed,
                stringsAsFactors = FALSE)
   }
   rbind(
@@ -165,7 +168,40 @@ mtd_configs <- function() {
         calibration = "calibration_shift_0.1.csv", startup = "diagonal", within_set = FALSE, seed = 4549),
     row("shift_0.1_eps_fixed_startup", "startup", shift = 0.1, startup = "diagonal", seed = 4550),
     row("shift_0.1_eps_fixed_pick_all_startup", "startup", shift = 0.1, startup = "diagonal",
-        within_set = FALSE, seed = 4551)
+        within_set = FALSE, seed = 4551),
+    # Isotonic final pick (#54, step 2): pick = "isotonic" with the settings
+    # of the row named in the comment, and its own seed. The id is the id of
+    # the interval-pick partner plus "_iso". The partner has within_set =
+    # FALSE where such a row exists (the first group), else within_set TRUE
+    # (the second group, which uses within_set = FALSE for the isotonic row).
+    row("single_pick_off_iso", "pick", within_set = FALSE, pick = "isotonic", seed = 4552),
+    row("baseline_iso", "pick", within_set = TRUE, pick = "isotonic", seed = 4553),
+    row("single_pick_off_startup_iso", "pick", startup = "diagonal", within_set = FALSE,
+        pick = "isotonic", seed = 4554),
+    row("eps_0.3_pick_all_iso", "pick", eps = 0.3, within_set = FALSE, pick = "isotonic", seed = 4555),
+    row("eps_0.4_pick_all_iso", "pick", eps = 0.4, within_set = FALSE, pick = "isotonic", seed = 4556),
+    row("eps_0.5_iso", "pick", eps = 0.5, within_set = FALSE, pick = "isotonic", seed = 4557),
+    row("eps_0.4_pick_all_startup_iso", "pick", eps = 0.4, startup = "diagonal", within_set = FALSE,
+        pick = "isotonic", seed = 4558),
+    row("shift_0.1_eps_fixed_pick_all_iso", "pick", shift = 0.1, within_set = FALSE,
+        pick = "isotonic", seed = 4559),
+    row("shift_0.1_eps_fixed_pick_all_startup_iso", "pick", shift = 0.1, startup = "diagonal",
+        within_set = FALSE, pick = "isotonic", seed = 4560),
+    row("selection_fewest_iso", "pick", selection = "fewest", within_set = FALSE, pick = "isotonic",
+        seed = 4561),
+    row("selection_inverse_n_iso", "pick", selection = "inverse_n", within_set = FALSE,
+        pick = "isotonic", seed = 4562),
+    row("taper_off_iso", "pick", taper = FALSE, within_set = FALSE, pick = "isotonic", seed = 4563),
+    row("weights_1_iso", "pick", weights = "1", within_set = FALSE, pick = "isotonic", seed = 4564),
+    row("prior_strength_1_iso", "pick", prior_strength = 1, within_set = FALSE, pick = "isotonic",
+        seed = 4565),
+    row("cohort_1_iso", "pick", cohort = 1, within_set = FALSE, pick = "isotonic", seed = 4566),
+    row("N_120_iso", "pick", N = 120, within_set = FALSE, pick = "isotonic", seed = 4567),
+    row("N_30_iso", "pick", N = 30, within_set = FALSE, pick = "isotonic", seed = 4568),
+    row("ref_ms_iso", "pick", rule = "ms", eps = NA_real_, weights = NA_character_,
+        taper = NA, selection = "min_S", prior_method = "bisection", admis = "closest",
+        constraint = "neighbouring", safety = 0.8, within_set = FALSE, pick = "isotonic",
+        seed = 4569)
   )
 }
 
@@ -193,7 +229,8 @@ mtd_design <- function(cfg, eps = mtd_eps(cfg)) {
                      prior_strength = cfg$prior_strength, prior_method = cfg$prior_method,
                      N = cfg$N, cohort = cfg$cohort, start = start, admis = cfg$admis,
                      constraint = cfg$constraint, safety = if (is.na(cfg$safety)) NULL else cfg$safety,
-                     selection = cfg$selection, delta = cfg$delta, within_set = cfg$within_set))
+                     selection = cfg$selection, delta = cfg$delta, within_set = cfg$within_set,
+                     pick = cfg$pick))
   }
   med <- switch(cfg$prior_form,
                 flat = rep(cfg$prior_median, K),
@@ -204,7 +241,7 @@ mtd_design <- function(cfg, eps = mtd_eps(cfg)) {
                 taper = cfg$taper, weights = cfg$weights, selection = cfg$selection,
                 shift = cfg$shift, startup = cfg$startup, prior_a = pr$a, prior_b = pr$b, N = cfg$N,
                 cohort = cfg$cohort, start = start,
-                delta = cfg$delta, within_set = cfg$within_set)
+                delta = cfg$delta, within_set = cfg$within_set, pick = cfg$pick)
 }
 
 # ---- Mechanism metrics, one value per trial ---------------------------------
@@ -277,6 +314,26 @@ mtd_startup_summarise <- function(id, sim) {
   data.frame(id = id, mean_n_startup = mean(n_startup),
              se_n_startup = stats::sd(n_startup) / sqrt(length(n_startup)),
              pct_phase_ended_by_toxicity = ended, stringsAsFactors = FALSE)
+}
+
+# Classes of the single pick (#54), one row: percentage of trials whose pick
+# is a true MTD (= PCS), is at true toxicity >= 0.45 (over), is at true
+# toxicity <= 0.15 (under), or that have no pick, then the pick percentage
+# of each combination (pct_pick_<label>). The remainder is the picks at
+# toxicities between 0.15 and 0.45 that are not MTDs.
+mtd_pick_classes <- function(id, sim, truth = sim@truth, theta = mtd_theta) {
+  labels <- combo_labels(sim@design@grid)
+  pick <- sim@summary$pick
+  nsim <- length(pick)
+  tox <- ifelse(is.na(pick), NA_real_, truth[pick])
+  pct <- function(x) 100 * sum(x, na.rm = TRUE) / nsim
+  p_combo <- 100 * tabulate(pick[!is.na(pick)], length(labels)) / nsim
+  names(p_combo) <- paste0("pct_pick_", labels)
+  cbind(data.frame(id = id, pct_pick_mtd = pct(mtd_is_mtd(truth, theta)[pick]),
+                   pct_pick_over = pct(tox >= 0.45 - 1e-8),
+                   pct_pick_under = pct(tox <= 0.15 + 1e-8),
+                   pct_no_pick = 100 * sum(is.na(pick)) / nsim, stringsAsFactors = FALSE),
+        as.data.frame(as.list(p_combo)))
 }
 
 # Units: fdr, tpr, pcs, p_set_false are proportions (0 to 1); names starting

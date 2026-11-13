@@ -89,7 +89,7 @@ show_groups(dtab)
 # metrics and the difference in PCS are in percent (points). The difference
 # is with minus without; the runs are independent, so SE and z are as above.
 # nStartup: mean number of cohorts in the phase, from mtd_startup_phase.csv.
-with_ids <- ids[cfgs$startup[match(ids, cfgs$id)] == "diagonal"]
+with_ids <- ids[cfgs$startup[match(ids, cfgs$id)] == "diagonal" & cfgs$pick[match(ids, cfgs$id)] == "interval"]
 if (length(with_ids)) {
   phase <- utils::read.csv("results/mtd_startup_phase.csv")
   pairs <- data.frame(without = sub("_startup$", "", with_ids), with = with_ids, stringsAsFactors = FALSE)
@@ -117,6 +117,54 @@ if (length(with_ids)) {
   print(st, row.names = FALSE, right = FALSE)
   cat(sprintf("Trials whose phase ended by a toxicity (percent): %.1f to %.1f.\n",
               min(phase$pct_phase_ended_by_toxicity), max(phase$pct_phase_ended_by_toxicity)))
+}
+
+# Isotonic pick (#54): each configuration with pick = "isotonic" next to its
+# interval-pick partner (the id without "_iso": the row with within_set =
+# FALSE where there is one, else the within-set row, so the partner may differ
+# in within_set; see wset). Percent metrics. The pick classes are computed
+# from the stored pct_pick of each combination, so they exist for the partners
+# too: over = pick at true toxicity >= 0.45, under = <= 0.15. dPCS: isotonic
+# minus partner, in points, with its SE and z (independent runs).
+iso_ids <- ids[cfgs$pick[match(ids, cfgs$id)] == "isotonic"]
+if (length(iso_ids)) {
+  pick_pct <- function(id) {
+    v <- res[res$id == id & res$metric == "pct_pick", ]
+    stopifnot(identical(v$combo, combo_labels(mtd_grid())))
+    c(over = sum(v$estimate[c(mtd_truth) >= 0.45 - 1e-8]), under = sum(v$estimate[c(mtd_truth) <= 0.15 + 1e-8]))
+  }
+  iso_row <- function(id, partner = NULL) {
+    d <- if (is.null(partner)) c(d = NA, se = NA, z = NA) else dif(id, "pcs", partner)
+    pk <- pick_pct(id)
+    data.frame(pair = sub("_iso$", "", if (is.null(partner)) id else partner),
+               pick = if (is.null(partner)) "interval" else "isotonic",
+               wset = cfgs$within_set[cfgs$id == id],
+               PCS = cell(id, "pcs", 100), FDR = cell(id, "fdr", 100), TPR = cell(id, "tpr", 100),
+               `%above` = cell(id, "pct_patients_above"), `%band` = cell(id, "pct_patients_in_band"),
+               `%below` = cell(id, "pct_patients_below"), `%pickOver` = sprintf("%.1f", pk[["over"]]),
+               `%pickUnder` = sprintf("%.1f", pk[["under"]]),
+               cohToContour = cell(id, "first_contour_cohort"), DLTs = cell(id, "n_dlt"),
+               `dPCS (SE)` = if (is.null(partner)) "-" else sprintf("%+.1f (%.1f)", d[["d"]], d[["se"]]),
+               zPCS = if (is.null(partner)) "-" else sprintf("%+.1f", d[["z"]]),
+               check.names = FALSE, stringsAsFactors = FALSE)
+  }
+  iso_pairs <- sub("_iso$", "", iso_ids)
+  stopifnot(all(iso_pairs %in% ids))
+  io <- do.call(rbind, lapply(seq_along(iso_ids), function(i) {
+    rbind(iso_row(iso_pairs[i]), iso_row(iso_ids[i], iso_pairs[i]))
+  }))
+  cat("\n== Isotonic pick: Riviere's interval pick vs the isotonic pick ==\n")
+  cat("pair: the interval-pick configuration. wset: within_set of the row. Estimate (Monte Carlo SE);\n")
+  cat("PCS, FDR, TPR in percent. %pickOver, %pickUnder: picks at true toxicity >= 0.45 and <= 0.15.\n")
+  cat("dPCS: isotonic minus interval, in percentage points.\n")
+  print(io, row.names = FALSE, right = FALSE)
+  cls <- utils::read.csv("results/mtd_pick_classes.csv")
+  stopifnot(setequal(cls$id, iso_ids))
+  chk <- vapply(cls$id, function(i) {
+    stored <- unlist(cls[cls$id == i, c("pct_pick_over", "pct_pick_under")])
+    max(abs(unlist(pick_pct(i)) - stored))
+  }, 0)
+  stopifnot(all(chk < 1e-4))
 }
 
 # All configurations sorted by PCS, best first.

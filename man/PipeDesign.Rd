@@ -72,6 +72,13 @@ holds: (a) a toxicity has been observed; (b) the current combination has
 every drug at its top level; (c) the next combination is not in the grid
 (a subset grid). No random number is drawn for the dose in the phase. It
 needs \code{rule = "cheung"}, \code{outcome = "binary"} and \code{target = "MTD"}.}
+
+\item{pick}{How the single dose is chosen: \code{"interval"} (Riviere's
+interval rule, the default) or \code{"isotonic"} (the tried dose whose
+weighted isotonic estimate of the toxicity rate, under the dose order of
+the grid, is closest to \code{theta}; ties go to the dose with more patients,
+then to the lower index). \code{"isotonic"} is for binary outcomes and
+\code{target = "MTD"} only.}
 }
 \value{
 A \code{PipeDesign} object.

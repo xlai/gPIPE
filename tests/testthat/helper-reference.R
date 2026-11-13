@@ -174,3 +174,29 @@ ref_ms_state <- function(spec) {
   }
   out
 }
+
+# Weighted isotonic regression by the max-min formula over all up-sets (tests
+# only). `levels` is the full array; `cells` the array cells that make the grid
+# (default all), and n, s1 hold one entry per cell in `cells`. Cells with
+# n = 0 are untried: no estimate (NA), but they still order the tried ones.
+# fit_i = max over up-sets A containing i of min over down-sets B containing i
+# of the weighted mean of s1 / n on A and B.
+ref_isotonic <- function(levels, n, s1, cells = seq_len(prod(levels))) {
+  tried <- which(n > 0)
+  up <- unique(ref_upsets(levels)[, cells[tried], drop = FALSE])
+  w <- n[tried]
+  y <- s1[tried]
+  fit <- rep(NA_real_, length(n))
+  for (j in seq_along(tried)) {
+    ups <- up[up[, j] == 1L, , drop = FALSE]
+    downs <- 1L - up[up[, j] == 0L, , drop = FALSE]
+    downs <- rbind(downs, 1L - up[0, , drop = FALSE])
+    # down-sets containing j are the complements of the up-sets without j
+    inner <- vapply(seq_len(nrow(ups)), function(a) {
+      both <- sweep(downs, 2, ups[a, ], `*`)
+      min(drop(both %*% y) / drop(both %*% w))
+    }, numeric(1))
+    fit[tried[j]] <- max(inner)
+  }
+  fit
+}

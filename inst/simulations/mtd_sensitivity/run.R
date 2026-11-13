@@ -5,7 +5,8 @@
 # (e.g. Rscript run.R 4 baseline eps_0.5), only those configurations run, and
 # only their rows in results/mtd_sensitivity.csv and
 # results/mtd_sensitivity_runs.csv are replaced. The rows with startup =
-# "diagonal" also write results/mtd_startup_phase.csv.
+# "diagonal" also write results/mtd_startup_phase.csv, and the rows with pick =
+# "isotonic" also write results/mtd_pick_classes.csv.
 #
 # Seeds: each configuration has its own `seed` in mtd_configs() and runs its
 # 10000 trials in one process with set.seed(seed) (Mersenne-Twister). The
@@ -31,7 +32,8 @@ run_one <- function(id) {
   phase <- if (cfg$startup == "diagonal") mtd_startup_summarise(id, sim)
   secs <- as.numeric(difftime(Sys.time(), t0, units = "secs"))
   run <- data.frame(id = id, nsim = mtd_nsim, seed = cfg$seed, eps = eps[[id]], seconds = round(secs))
-  list(res = res, phase = phase, run = run)
+  classes <- if (cfg$pick == "isotonic") mtd_pick_classes(id, sim, mtd_truth)
+  list(res = res, phase = phase, classes = classes, run = run)
 }
 out <- parallel::mclapply(ids, run_one, mc.cores = min(cores, length(ids)), mc.preschedule = FALSE)
 bad <- !vapply(out, is.list, logical(1))
@@ -77,4 +79,20 @@ if (!is.null(phase)) {
   phase <- phase[order(match(phase$id, cfgs$id)), ]
   utils::write.csv(phase, f, row.names = FALSE)
   print(phase, row.names = FALSE)
+}
+
+# Classes of the single pick of the isotonic rows (#54): kept apart from the
+# long format so that the stored rows of the other configurations stay as
+# they were. One row per configuration with pick = "isotonic".
+classes <- do.call(rbind, lapply(out, `[[`, "classes"))
+if (!is.null(classes)) {
+  classes[-1] <- lapply(classes[-1], signif, 7)
+  f <- file.path(dir, "mtd_pick_classes.csv")
+  if (file.exists(f)) {
+    old <- utils::read.csv(f)
+    classes <- rbind(old[!old$id %in% classes$id, names(classes)], classes)
+  }
+  classes <- classes[order(match(classes$id, cfgs$id)), ]
+  utils::write.csv(classes, f, row.names = FALSE)
+  print(classes[1:5], row.names = FALSE)
 }

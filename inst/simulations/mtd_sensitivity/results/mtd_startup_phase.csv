@@ -10,3 +10,6 @@
 "shift_0.1_pick_all_fewest_startup",2.4773,0.0086842,98.98
 "shift_0.1_eps_fixed_startup",2.4816,0.0086864,99
 "shift_0.1_eps_fixed_pick_all_startup",2.485,0.0087364,98.86
+"single_pick_off_startup_iso",2.4902,0.0086786,98.82
+"eps_0.4_pick_all_startup_iso",2.4911,0.0086672,98.88
+"shift_0.1_eps_fixed_pick_all_startup_iso",2.4758,0.0086619,98.92

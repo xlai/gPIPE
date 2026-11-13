@@ -227,6 +227,25 @@ with `pct_` are percentages. The others are counts.
   `calibration_shift_0.025.csv`, `riviere2014_scenario1_pcs.csv`.
 - `mtd_startup_phase.csv`: the start-up phase of the `*_startup` rows:
   `id`, `mean_n_startup`, `se_n_startup`, `pct_phase_ended_by_toxicity`.
+- `mtd_pick_classes.csv`: for the `*_iso` rows only: `pct_pick_mtd` (= PCS),
+  `pct_pick_over` (pick at true toxicity 0.45 or more), `pct_pick_under`
+  (0.15 or less), `pct_no_pick`, and `pct_pick_<combination>` for each of
+  the 15 combinations.
+
+## Isotonic pick (#54)
+
+The `pick` column of `mtd_configs()` is `"interval"` (Riviere's interval
+rule, the default) or `"isotonic"` (the tried dose whose isotonic toxicity
+estimate is closest to theta). The 18 rows of factor `pick` have the id of
+their interval-pick partner plus `_iso`, and the settings of the partner
+except `pick`, and `within_set = FALSE` (the one exception is `baseline_iso`,
+which keeps `within_set = TRUE`). The partner has `within_set = FALSE` where
+that row exists (for example `single_pick_off`, `eps_0.3_pick_all`), and
+otherwise `within_set = TRUE` (for example `eps_0.5`, `selection_fewest`). The
+pick does not change how patients are treated or the final set, so FDR and
+TPR agree with the partner's up to Monte Carlo error; PCS, the pick classes
+and the cohorts of the pick differ. `report.R` has an "Isotonic pick"
+section with the pairs.
 
 ## Seeds
 
@@ -244,6 +263,7 @@ From this folder:
     Rscript calibrate.R 1 0.05 results/calibration_shift_0.1.csv 0.1 0.1   # ..., band, shift
     Rscript run.R 4              # all configurations, about 4 minutes on 4 cores
     Rscript run.R 4 eps_0.5      # only these, and only their rows change
+    Rscript run.R 4 single_pick_off_iso   # an isotonic row; also writes results/mtd_pick_classes.csv
     Rscript report.R [id]        # tables; grids for one configuration
 
 Run times for 10000 trials: about 25 seconds per row, `cohort_1` about 75
