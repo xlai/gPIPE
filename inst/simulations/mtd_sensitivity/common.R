@@ -69,6 +69,8 @@ mtd_is_contour <- function(truth = c(mtd_truth), theta = mtd_theta) truth >= the
 #   pick:         "interval" (Riviere's interval rule for the single pick) or
 #                 "isotonic" (the tried dose whose isotonic toxicity estimate
 #                 is closest to theta, #54), cheung and ms rows;
+#   selection "closest" (#57): the next cohort goes to the sampling-set dose
+#                 whose isotonic estimate is closest to theta (cheung only);
 #   N, cohort, start (NA = the default, combination 1), delta, within_set;
 #   admis, constraint, safety: M&S options ("ms" only; safety NA = none);
 #   seed:         seed of this configuration's simulation (unique per row).
@@ -201,7 +203,36 @@ mtd_configs <- function() {
     row("ref_ms_iso", "pick", rule = "ms", eps = NA_real_, weights = NA_character_,
         taper = NA, selection = "min_S", prior_method = "bisection", admis = "closest",
         constraint = "neighbouring", safety = 0.8, within_set = FALSE, pick = "isotonic",
-        seed = 4569)
+        seed = 4569),
+    # Closest-to-target selection (#57, step 2): selection = "closest" with
+    # pick = "isotonic" and within_set = FALSE, unless the id says otherwise.
+    # Partners (same conduct, equal selection): the "_iso" row of the same
+    # setting; closest_iso_alpha_0.10 has none (nearest: alpha_0.10, which is
+    # interval pick, within_set TRUE); closest_interval: single_pick_off.
+    row("closest_iso", "closest", selection = "closest", within_set = FALSE, pick = "isotonic",
+        seed = 4570),
+    row("closest_iso_startup", "closest", selection = "closest", startup = "diagonal",
+        within_set = FALSE, pick = "isotonic", seed = 4571),
+    row("closest_iso_eps_0.3", "closest", eps = 0.3, selection = "closest", within_set = FALSE,
+        pick = "isotonic", seed = 4572),
+    row("closest_iso_eps_0.5", "closest", eps = 0.5, selection = "closest", within_set = FALSE,
+        pick = "isotonic", seed = 4573),
+    row("closest_iso_alpha_0.10", "closest", selection = "closest",
+        calibration = "calibration_alpha_0.10.csv", within_set = FALSE, pick = "isotonic", seed = 4574),
+    row("closest_iso_taper_off", "closest", taper = FALSE, selection = "closest", within_set = FALSE,
+        pick = "isotonic", seed = 4575),
+    row("closest_iso_weights_1", "closest", weights = "1", selection = "closest", within_set = FALSE,
+        pick = "isotonic", seed = 4576),
+    row("closest_iso_prior_strength_1", "closest", prior_strength = 1, selection = "closest",
+        within_set = FALSE, pick = "isotonic", seed = 4577),
+    row("closest_iso_N_30", "closest", N = 30, selection = "closest", within_set = FALSE,
+        pick = "isotonic", seed = 4578),
+    row("closest_iso_N_120", "closest", N = 120, selection = "closest", within_set = FALSE,
+        pick = "isotonic", seed = 4579),
+    row("closest_iso_cohort_1", "closest", cohort = 1, selection = "closest", within_set = FALSE,
+        pick = "isotonic", seed = 4580),
+    row("closest_interval", "closest", selection = "closest", within_set = FALSE, pick = "interval",
+        seed = 4581)
   )
 }
 
@@ -334,6 +365,34 @@ mtd_pick_classes <- function(id, sim, truth = sim@truth, theta = mtd_theta) {
                    pct_pick_under = pct(tox <= 0.15 + 1e-8),
                    pct_no_pick = 100 * sum(is.na(pick)) / nsim, stringsAsFactors = FALSE),
         as.data.frame(as.list(p_combo)))
+}
+
+# Partner of each closest-selection row (#57): the stored row with the same
+# conduct and equal selection. closest_iso_alpha_0.10 has no isotonic
+# partner; alpha_0.10 (interval pick, within_set TRUE) is the nearest.
+mtd_closest_partners <- function() {
+  c(closest_iso = "single_pick_off_iso", closest_iso_startup = "single_pick_off_startup_iso",
+    closest_iso_eps_0.3 = "eps_0.3_pick_all_iso", closest_iso_eps_0.5 = "eps_0.5_iso",
+    closest_iso_alpha_0.10 = "alpha_0.10", closest_iso_taper_off = "taper_off_iso",
+    closest_iso_weights_1 = "weights_1_iso", closest_iso_prior_strength_1 = "prior_strength_1_iso",
+    closest_iso_N_30 = "N_30_iso", closest_iso_N_120 = "N_120_iso",
+    closest_iso_cohort_1 = "cohort_1_iso", closest_interval = "single_pick_off")
+}
+
+# Exposure to over-toxic doses (#57), one row: percentage of trials that treat
+# at least one cohort at a combination with true toxicity >= 0.55 (resp.
+# >= 0.45), mean patients per trial at toxicity >= 0.45, and mean patients at
+# the true MTDs. `sim@n` is the number of patients per combination.
+mtd_exposure <- function(id, sim, truth = sim@truth, theta = mtd_theta) {
+  n <- sim@n
+  hi55 <- truth >= 0.55 - 1e-8
+  hi45 <- truth >= 0.45 - 1e-8
+  data.frame(id = id,
+             pct_trials_ever_055 = 100 * mean(rowSums(n[, hi55, drop = FALSE]) > 0),
+             pct_trials_ever_045 = 100 * mean(rowSums(n[, hi45, drop = FALSE]) > 0),
+             mean_n_at_045plus = mean(rowSums(n[, hi45, drop = FALSE])),
+             mean_n_at_mtd = mean(rowSums(n[, mtd_is_mtd(truth, theta), drop = FALSE])),
+             stringsAsFactors = FALSE)
 }
 
 # Units: fdr, tpr, pcs, p_set_false are proportions (0 to 1); names starting

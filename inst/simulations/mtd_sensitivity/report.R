@@ -2,8 +2,8 @@
 # grouped by factor with the baseline repeated at the top of each group, the
 # difference from the baseline in PCS, FDR and TPR (with its SE and z), the
 # start-up phase pairs (without and with the phase), the selection grid of one
-# configuration, a table of all configurations sorted by PCS, and Riviere's
-# reference line.
+# configuration, the closest-selection pairs, a table of all configurations
+# sorted by PCS, and Riviere's reference line.
 # Usage: Rscript report.R [id = baseline]
 # Run from this folder.
 library(gPIPE)
@@ -122,11 +122,12 @@ if (length(with_ids)) {
 # Isotonic pick (#54): each configuration with pick = "isotonic" next to its
 # interval-pick partner (the id without "_iso": the row with within_set =
 # FALSE where there is one, else the within-set row, so the partner may differ
-# in within_set; see wset). Percent metrics. The pick classes are computed
+# in within_set; see wset). The closest-selection rows have their own section below.
+# Percent metrics. The pick classes are computed
 # from the stored pct_pick of each combination, so they exist for the partners
 # too: over = pick at true toxicity >= 0.45, under = <= 0.15. dPCS: isotonic
 # minus partner, in points, with its SE and z (independent runs).
-iso_ids <- ids[cfgs$pick[match(ids, cfgs$id)] == "isotonic"]
+iso_ids <- ids[cfgs$pick[match(ids, cfgs$id)] == "isotonic" & cfgs$selection[match(ids, cfgs$id)] != "closest"]
 if (length(iso_ids)) {
   pick_pct <- function(id) {
     v <- res[res$id == id & res$metric == "pct_pick", ]
@@ -159,12 +160,64 @@ if (length(iso_ids)) {
   cat("dPCS: isotonic minus interval, in percentage points.\n")
   print(io, row.names = FALSE, right = FALSE)
   cls <- utils::read.csv("results/mtd_pick_classes.csv")
-  stopifnot(setequal(cls$id, iso_ids))
-  chk <- vapply(cls$id, function(i) {
+  stopifnot(all(iso_ids %in% cls$id))
+  chk <- vapply(iso_ids, function(i) {
     stored <- unlist(cls[cls$id == i, c("pct_pick_over", "pct_pick_under")])
     max(abs(unlist(pick_pct(i)) - stored))
   }, 0)
   stopifnot(all(chk < 1e-4))
+}
+
+# Closest-to-target selection (#57): each configuration with selection =
+# "closest" next to its partner (same conduct, equal selection; see
+# mtd_closest_partners(): closest_iso_alpha_0.10 has no isotonic partner, so
+# alpha_0.10 is the nearest, and closest_interval has interval pick, so its
+# partner is single_pick_off). Percent metrics. dPCS: closest minus partner,
+# in points, with its SE and z (independent runs). Exposure (from
+# mtd_exposure.csv, written by run.R and exposure_partners.R): %ever55 and
+# %ever45 are the percentage of trials that treat a cohort at true toxicity
+# >= 0.55 and >= 0.45; nAt45 and nAtMTD are mean patients per trial at
+# toxicity >= 0.45 and at the true MTDs.
+cl_ids <- ids[cfgs$selection[match(ids, cfgs$id)] == "closest"]
+if (length(cl_ids)) {
+  cl_partner <- mtd_closest_partners()[cl_ids]
+  stopifnot(!anyNA(cl_partner), all(cl_partner %in% ids))
+  expo <- utils::read.csv("results/mtd_exposure.csv")
+  stopifnot(all(c(cl_ids, cl_partner) %in% expo$id))
+  pick_pct2 <- function(id) {
+    v <- res[res$id == id & res$metric == "pct_pick", ]
+    c(over = sum(v$estimate[c(mtd_truth) >= 0.45 - 1e-8]), under = sum(v$estimate[c(mtd_truth) <= 0.15 + 1e-8]))
+  }
+  cl_row <- function(id, name, partner = NULL) {
+    d <- if (is.null(partner)) c(d = NA, se = NA, z = NA) else dif(id, "pcs", partner)
+    pk <- pick_pct2(id)
+    ex <- expo[expo$id == id, ]
+    data.frame(row = name, selection = if (is.null(partner)) "partner" else "closest", id = id,
+               PCS = cell(id, "pcs", 100),
+               `dPCS (SE)` = if (is.null(partner)) "-" else sprintf("%+.1f (%.1f)", d[["d"]], d[["se"]]),
+               zPCS = if (is.null(partner)) "-" else sprintf("%+.1f", d[["z"]]),
+               FDR = cell(id, "fdr", 100), TPR = cell(id, "tpr", 100),
+               `%above` = cell(id, "pct_patients_above"), `%band` = cell(id, "pct_patients_in_band"),
+               `%below` = cell(id, "pct_patients_below"), `%pickOver` = sprintf("%.1f", pk[["over"]]),
+               `%pickUnder` = sprintf("%.1f", pk[["under"]]), DLTs = cell(id, "n_dlt"),
+               `%ever55` = sprintf("%.1f", ex$pct_trials_ever_055), `%ever45` = sprintf("%.1f", ex$pct_trials_ever_045),
+               nAt45 = sprintf("%.1f", ex$mean_n_at_045plus), nAtMTD = sprintf("%.1f", ex$mean_n_at_mtd),
+               check.names = FALSE, stringsAsFactors = FALSE)
+  }
+  cl <- do.call(rbind, lapply(seq_along(cl_ids), function(i) {
+    nm <- sub("^closest_(iso_)?", "", cl_ids[i])
+    nm <- if (nm == "") "baseline" else nm
+    rbind(cl_row(cl_partner[[i]], nm), cl_row(cl_ids[i], nm, cl_partner[[i]]))
+  }))
+  cat("\n== Closest-to-target selection: equal selection (partner) vs selection = \"closest\" ==\n")
+  cat("Estimate (Monte Carlo SE); PCS, FDR, TPR in percent. dPCS: closest minus partner, in points.\n")
+  cat("%pickOver, %pickUnder: picks at true toxicity >= 0.45 and <= 0.15.\n")
+  cat("%ever55, %ever45: percent of trials that treat a cohort at true toxicity >= 0.55, >= 0.45.\n")
+  cat("nAt45, nAtMTD: mean patients per trial at toxicity >= 0.45, and at the true MTDs.\n")
+  cat("closest_iso_alpha_0.10: no isotonic partner; the nearest, alpha_0.10, has the interval pick and\n")
+  cat("within_set TRUE.\n")
+  cat("closest_interval: interval pick; its partner is single_pick_off.\n")
+  print(cl, row.names = FALSE, right = FALSE)
 }
 
 # All configurations sorted by PCS, best first.

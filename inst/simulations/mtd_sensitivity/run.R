@@ -6,7 +6,8 @@
 # only their rows in results/mtd_sensitivity.csv and
 # results/mtd_sensitivity_runs.csv are replaced. The rows with startup =
 # "diagonal" also write results/mtd_startup_phase.csv, and the rows with pick =
-# "isotonic" also write results/mtd_pick_classes.csv.
+# "isotonic" also write results/mtd_pick_classes.csv, and the rows with
+# selection = "closest" also write results/mtd_exposure.csv.
 #
 # Seeds: each configuration has its own `seed` in mtd_configs() and runs its
 # 10000 trials in one process with set.seed(seed) (Mersenne-Twister). The
@@ -33,7 +34,8 @@ run_one <- function(id) {
   secs <- as.numeric(difftime(Sys.time(), t0, units = "secs"))
   run <- data.frame(id = id, nsim = mtd_nsim, seed = cfg$seed, eps = eps[[id]], seconds = round(secs))
   classes <- if (cfg$pick == "isotonic") mtd_pick_classes(id, sim, mtd_truth)
-  list(res = res, phase = phase, classes = classes, run = run)
+  exposure <- if (cfg$selection == "closest") mtd_exposure(id, sim, mtd_truth)
+  list(res = res, phase = phase, classes = classes, exposure = exposure, run = run)
 }
 out <- parallel::mclapply(ids, run_one, mc.cores = min(cores, length(ids)), mc.preschedule = FALSE)
 bad <- !vapply(out, is.list, logical(1))
@@ -95,4 +97,21 @@ if (!is.null(classes)) {
   classes <- classes[order(match(classes$id, cfgs$id)), ]
   utils::write.csv(classes, f, row.names = FALSE)
   print(classes[1:5], row.names = FALSE)
+}
+
+# Exposure to over-toxic doses of the closest-selection rows (#57): kept apart
+# from the long format so that the stored rows of the other configurations
+# stay as they were. exposure_partners.R adds the same four numbers for the
+# partner rows (it re-simulates them with their stored seeds).
+exposure <- do.call(rbind, lapply(out, `[[`, "exposure"))
+if (!is.null(exposure)) {
+  exposure[-1] <- lapply(exposure[-1], signif, 7)
+  f <- file.path(dir, "mtd_exposure.csv")
+  if (file.exists(f)) {
+    old <- utils::read.csv(f)
+    exposure <- rbind(old[!old$id %in% exposure$id, names(exposure)], exposure)
+  }
+  exposure <- exposure[order(match(exposure$id, cfgs$id)), ]
+  utils::write.csv(exposure, f, row.names = FALSE)
+  print(exposure, row.names = FALSE)
 }
